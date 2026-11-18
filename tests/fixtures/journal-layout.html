@@ -1,0 +1,90 @@
+<!-- Layout-quality fixture: PLOS-style single column page and a two-column journal page.
+     Exercises justified serif prose, bold caption titles, a table, figure labels,
+     a display equation, footnotes, running heads and a paragraph continued across columns. -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+@page{size:612pt 792pt;margin:0}body{margin:0;color:#111}
+.page{position:relative;width:612pt;height:792pt;overflow:hidden;break-after:page}
+.hdr{position:absolute;left:36pt;top:28pt;width:540pt;border-bottom:.7pt solid #555;font:bold 12pt 'Liberation Sans',Arial,Helvetica,sans-serif;padding-bottom:3pt}.hdr span{float:right;font:normal 7.5pt 'Liberation Sans',Arial,Helvetica,sans-serif;padding-top:4pt}
+.foot{position:absolute;left:36pt;top:752pt;width:540pt;border-top:.7pt solid #555;font:7pt 'Liberation Sans',Arial,Helvetica,sans-serif;padding-top:4pt}.foot span{float:right}
+.main{position:absolute;left:198pt;top:70pt;width:378pt;font:9.5pt/12.5pt 'Liberation Serif','Times New Roman',Times,serif;text-align:justify}
+h3{font:bold 10.5pt 'Liberation Serif','Times New Roman',Times,serif;margin:10pt 0 4pt}p{margin:0;text-indent:10pt}p.f{text-indent:0}
+sup{font-size:6pt;line-height:0}sub{font-size:.7em;line-height:0}
+/* Ink just above a paragraph's extracted box, like glyph tops of fonts whose
+   reported ascent is lower than the drawn glyphs (real PLOS sidebar case). */
+p.ink{position:relative}p.ink::before{content:"";position:absolute;left:0;right:30%;top:-1.2pt;height:1.1pt;background:radial-gradient(circle,#222 45%,transparent 50%) 0 0/3pt 1.1pt repeat-x}a{color:#2a5db0;text-decoration:none}
+.eq{text-align:center;margin:7pt 0;font-style:italic}.eq span{float:right;font-style:normal}
+.cap{font:8pt/10.5pt 'Liberation Sans',Arial,Helvetica,sans-serif;text-align:left;margin:8pt 0 4pt}.cap b{font-weight:bold}
+table{border-collapse:collapse;width:100%;font:7.5pt/10pt 'Liberation Sans',Arial,Helvetica,sans-serif;margin-bottom:6pt}th{border-top:.7pt solid #000;border-bottom:.5pt solid #000;text-align:left;padding:2pt}td{padding:2pt}tr:last-child td{border-bottom:.7pt solid #000}
+.fig{height:120pt;border:.5pt solid #999;position:relative;margin-top:8pt;background:#fff}.fig svg{width:100%;height:100%}
+/* two-column page */
+.two{position:absolute;left:54pt;top:70pt;width:504pt;font:9pt/11pt 'Liberation Serif','Times New Roman',Times,serif;text-align:justify}
+.two h1{font:bold 15pt 'Liberation Sans',Arial,Helvetica,sans-serif;text-align:left;margin:0 0 4pt}.two .au{font:9pt 'Liberation Sans',Arial,Helvetica,sans-serif;text-align:left;margin-bottom:10pt}
+.cols{column-count:2;column-gap:18pt}.cols h4{font:bold 9.5pt 'Liberation Sans',Arial,Helvetica,sans-serif;margin:6pt 0 3pt}
+.note{position:absolute;left:54pt;top:705pt;width:240pt;font:7pt/9pt 'Liberation Serif','Times New Roman',Times,serif;border-top:.5pt solid #000;padding-top:3pt}
+</style></head><body>
+<div class="page"><div class="hdr">PLOS COMPUTATIONAL BIOLOGY<span>Bayesian mixed-effects model of microbial growth</span></div><div class="main">
+<h3>Model comparison</h3>
+<p class="f ink">We compared the hierarchical model with parametric alternatives across all experimental batches<sup>12,15</sup>. Posterior predictive checks were computed for every strain, and the expected log predictive density was estimated with leave-one-out cross validation [<a>34</a>]. The hierarchical model consistently improved predictive accuracy when batch effects were present, while performing similarly to simpler models in their absence.</p>
+<p>Table 1 summarises the comparison. Differences were largest for strains grown under oxidative stress, where parametric growth curves failed to capture the delayed recovery phase observed in the data.</p>
+<div class="cap"><b>Table 1. Predictive performance of growth models.</b> Values are mean expected log predictive density (ELPD) with standard errors.</div>
+<table><tr><th>Model</th><th>Condition</th><th>ELPD</th><th>SE</th></tr>
+<tr><td>Logistic</td><td>Standard medium</td><td>−412.3</td><td>8.1</td></tr>
+<tr><td>Gompertz</td><td>Standard medium</td><td>−405.9</td><td>7.7</td></tr>
+<tr><td>Hierarchical GP</td><td>Oxidative stress</td><td>−298.4</td><td>6.2</td></tr></table>
+<!-- Extraction artifacts of publisher math fonts: "(" ")" as ð Þ, a hat before its letter, ∼ as U+FFFD. -->
+<p class="f">The posterior distribution of the batch variance indicates that technical variation accounts for a substantial fraction of the observed differences between replicate experiments, with a mean function ^f ðtÞ estimated at �0.05 per hour.</p>
+<div class="eq">σ²<sub>batch</sub> = Var(β<sub>b</sub>) / (Var(β<sub>b</sub>) + σ²)<span>(4)</span></div>
+<div class="fig"><svg viewBox="0 0 378 120"><line x1="40" y1="100" x2="360" y2="100" stroke="#000"/><line x1="40" y1="10" x2="40" y2="100" stroke="#000"/><polyline fill="none" stroke="#2a5db0" stroke-width="2" points="40,95 100,90 160,60 220,30 300,22 360,20"/><text x="170" y="116" font-size="8" font-family="Liberation Sans">Time (h)</text><text x="4" y="55" font-size="8" font-family="Liberation Sans">OD600</text></svg></div>
+<div class="cap"><b>Fig 2. Estimated growth curves under oxidative stress.</b> Solid lines show posterior mean growth; shaded regions indicate 95% credible intervals across biological replicates.</div>
+</div><div class="foot">PLOS Computational Biology | https://doi.org/10.1371/journal.pcbi.1008366 October 26, 2020<span>7 / 21</span></div></div>
+<div class="page"><div class="two"><h1>Hierarchical models for growth curve analysis</h1><div class="au">A. Researcher and B. Scientist</div>
+<div class="cols">
+<h4>1. Introduction</h4>
+<p class="f">Microbial growth curves are routinely measured in high throughput plate readers. These measurements are affected by many sources of variation, including differences between batches, plates and wells. Traditional analyses summarise each curve with a small number of parameters and ignore this structure, which can lead to biased estimates and overconfident conclusions.</p>
+<p>In this work we develop a hierarchical model that represents each level of variation explicitly. The model provides estimates of biological effects together with their uncertainty and allows researchers to quantify the relative importance of technical factors.<sup>1</sup></p>
+<h4>2. Methods</h4>
+<p class="f">Growth was measured every thirty minutes for forty eight hours. Each experiment included at least three biological replicates and three technical replicates per condition. Optical density was log transformed and normalised to the first measurement of each well before analysis.</p>
+<p>Model parameters were estimated with Hamiltonian Monte Carlo using four chains of two thousand iterations each. Convergence was assessed with the potential scale reduction factor, and all parameters satisfied the conventional threshold.</p>
+<h4>3. Results</h4>
+<p class="f">The hierarchical model identified strong batch effects in two of the five experiments. After accounting for these effects, the estimated difference between treatment and control growth rates decreased by approximately thirty percent, and the corresponding credible intervals became wider but better calibrated.</p>
+<p>Simulation studies confirmed that ignoring batch structure inflates the false discovery rate when the number of replicates is small. The proposed approach maintained nominal error rates across all simulated scenarios.</p>
+</div></div>
+<div class="note"><sup>1</sup> Source code is available from the authors upon reasonable request.</div>
+<div class="foot">Journal of Example Studies 12 (2024) 101–115<span>102</span></div></div>
+<div class="page"><div class="hdr">PLOS COMPUTATIONAL BIOLOGY<span>Bayesian mixed-effects model of microbial growth</span></div><div class="main">
+<!-- Text as a publisher math font extracts it: "(" ")" as ð Þ (nested), "=" as ¼, "+" as þ, "∼" as U+FFFD. -->
+<p class="f"><b>Fixed effects.</b> We first define the fixed effects models used in this study; these will be augmented with random effects in the next section. To estimate a mean growth profile, a mean function mðtÞ is estimated from the data by modeling each replicate yrðtÞ for 1 � r � R as consisting of an unknown mean function observed with additive noise (Eq (3)).</p>
+<div class="eq">yrðtÞ ¼ mðtÞ þ rðtÞ<span>(3)</span></div>
+<p class="f">Where mðtÞ � GPð0; kmðt; t0ÞÞ provides a prior distribution over m, and km is an RBF kernel with hyperparameters fs2 m; ‘mg. Here rðtÞ � Nð0; s2 r IÞ is Gaussian white noise. When estimating the effect of a perturbation on growth, as in the case of OS, we add a second function dðtÞ that represents the effect of the stress being considered. The model then becomes (Eq (4)):</p>
+<div class="eq">yrðtÞ ¼ mðtÞ þ dðtÞ þ rðtÞ<span>(4)</span></div>
+<p class="f">where dðtÞ � GPð0; kdðt; t0ÞÞ also follows a GP prior independently of m, and kd has hyperparameters fs2 d; ‘dg. When incorporating possible interaction effects such as those between pH and organic acids in the P. aeruginosa dataset, the model becomes (Eq (5)):</p>
+<div class="eq">yrðt; p; mÞ ¼ mðtÞ þ apðtÞ þ bcðtÞ þ ðabÞp;cðtÞ þ rðtÞ;<span>(5)</span></div>
+<p class="f">for pH p and molar acid concentration c, with apðtÞ representing the main effect of pH, bcðtÞ the main effect of acid concentration, and ðabÞp;cðtÞ the interaction between them. Each effect is drawn from a treatment specific GP prior (Eq (6)).</p>
+<div class="eq">apðtÞ � GPð0; kaðt; t0ÞÞ<span>(6)</span></div>
+<div class="eq">bcðtÞ � GPð0; kbðt; t0ÞÞ</div>
+<p>Again, each covariance function is specified by a RBF kernel with corresponding variance and lengthscale hyperparameters that adapt to the observed data. All models in this section correspond to Mnull for their respective analyses, as they do not include any random effects.</p>
+</div><div class="foot">PLOS Computational Biology | https://doi.org/10.1371/journal.pcbi.1008366 October 26, 2020<span>9 / 21</span></div></div>
+<div class="page"><div class="hdr">PLOS COMPUTATIONAL BIOLOGY<span>Bayesian mixed-effects model of microbial growth</span></div><div class="main">
+<!-- Model section as extracted: indented paragraphs, a bold run-in heading and encoded inline math. -->
+<p class="f">lengthscales between fixed and random effects. Other M<sub>null</sub> models are converted to M<sub>batch</sub> similarly, with each fixed effect becoming a mean of a GP prior for each batch effect.</p>
+<!-- Equation (7) with overbraces, as PLOS math extension fonts extract them ("zﬄﬄ}|ﬄﬄ{"). -->
+<div class="eq" style="margin:6pt 0 0;line-height:1;padding-left:40pt">zﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄ}|ﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄ{&nbsp;&nbsp;&nbsp;zﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄ}|ﬄﬄﬄﬄﬄﬄﬄﬄﬄﬄ{</div>
+<div class="eq" style="margin:1pt 0 7pt">yk;rðt; p; mÞ ¼ mðtÞ þ apðtÞ þ bcðtÞ þ ðabÞp;cðtÞ þ m<sup>ðkÞ</sup>ðtÞ þ a<sup>ðkÞ</sup><sub>p</sub>ðtÞ þ b<sup>ðkÞ</sup><sub>c</sub>ðtÞ þ �<sub>k;r</sub>ðtÞ<span>(7)</span></div>
+<p>Mfull develops the hierarchy one step deeper by adding replicate effects to Mbatch (Eq 7). Specifically, the error model �k,r is now described by a GP: �k,r � GPð0; kyðt; t0ÞÞ with corresponding hyperparameters, accounting for replicate-specific variability rather than simply white noise, as shared with the batch functions of Mnull (Eq (8)).</p>
+<!-- A display equation whose tall bracket's em box reaches into the paragraph above. -->
+<div class="eq" style="margin:12pt 0 9pt">yk;rðtÞ ¼ mðtÞ þ bkðtÞ þ <b style="font:normal 30pt/0 'Liberation Serif',serif">[</b>k;rðtÞ<b style="font:normal 30pt/0 'Liberation Serif',serif">]</b><span>(8)</span></div>
+<p><b>Bayesian inference.</b> The unknown functions (mðtÞ; dðtÞ; apðtÞ; bcðtÞ; and ðabÞp;cðtÞ), kernel hyperparameters (s2 l and ‘l) for each group of latent functions, and observation noise parameters (s2 y) are all estimated by Bayesian statistical inference. In Bayesian inference, prior distributions on unknown quantities (e.g. pðmðtÞ; ymÞ ¼ pðmðtÞjymÞ × pðymÞ) are combined with the likelihood, pðyðtÞjmðtÞÞ to obtain the posterior distribution pðmðtÞ; ymjyðtÞÞ.</p>
+<p>Latent functions are grouped by shared kernel hyperparameters yl ¼ fs2 l; ‘lg into related sets (e.g. treatment effects, interaction effects, batch effects), which then provide the GP prior for the latent function. For each group, s2 l is assigned a Gammaða; bÞ prior, with fixed effects assigned as a Gammað10; 10Þ prior and random effects assigned a Gammað7; 10Þ prior. ‘l was assigned an inverse- Gammaða; bÞ prior, with parameter a ¼ 6 and b ¼ 1 for H. salinarum, and a ¼ 2, b ¼ 3 for P. aeruginosa fixed effects and a ¼ 10, b ¼ 1 for P. aeruginosa random effects. Noise variance s2 y was also assigned a gamma prior.</p>
+<p>Bayesian inference was then performed, with the posterior distribution obtained by sampling using Markov chain Monte Carlo (MCMC) implemented with the Stan library, which uses a Hamiltonian Monte-Carlo procedure with No-U-turn sampling [55]. Multiple chains were run to diagnose convergence, with all parameter posterior means confirmed to have con-<br>verged within R^ &lt; 1:1 as recommended [56].</p>
+<h3 style="font-family:'Liberation Sans',Arial,sans-serif;font-size:13pt;margin-top:16pt">Results</h3>
+<p class="f">In the dataset used here, population growth for each of P. aeruginosa and H. salinarum cultures was monitored under standard (non-stressed) conditions vs. stress conditions (see Materials and methods and references [22, 23] for precise definition of standard conditions).</p>
+</div><div class="foot">PLOS Computational Biology | https://doi.org/10.1371/journal.pcbi.1008366 October 26, 2020<span>10 / 21</span></div></div>
+<div class="page"><div class="hdr">PLOS COMPUTATIONAL BIOLOGY<span>Bayesian mixed-effects model of microbial growth</span></div><div class="main">
+<!-- Reference list as PLOS sets it: the bold entry number right-aligned in its
+     own column (a hair below the text baseline), every line of the entry text
+     aligned after it, a wrapped line starting "6. https", no gap between entries. -->
+<h3 style="font-family:'Liberation Sans',Arial,sans-serif;font-size:13pt">References</h3>
+<style>.ref{font:8pt/11pt 'Liberation Sans',Arial,sans-serif;display:grid;grid-template-columns:12pt 1fr;column-gap:10pt;text-align:left;margin:0}.ref i{font-style:normal;font-weight:bold;text-align:right;position:relative;top:.5pt}</style>
+<div class="ref"><i>8.</i><span>Tonner PD, Darnell CL, Engelhardt BE, Schmid AK. Detecting differential growth of microbial populations with Gaussian process regression. Genome Res. 2017; 27(2):320–333.</span></div><div class="ref"><i>9.</i><span>Zwietering MH, Jongenburger I, Rombouts FM, van 't Riet K. Modeling of the bacterial growth curve. Appl Environ Microbiol. 1990; 56(6):1875–1881.</span></div><div class="ref"><i>10.</i><span>Kahm M, Hasenbrink G, Lichtenberg-Fraté H, Ludwig J, Kschischo M. grofit: Fitting biological growth curves with R. J Stat Softw. 2010; 33(7):1–21.</span></div><div class="ref"><i>11.</i><span>Egli T. Microbial growth and physiology: a call for better craftsmanship. Frontiers in Microbiology. 2015;<br>6. https://doi.org/10.3389/fmicb.2015.00287 PMID: 25926822</span></div><div class="ref"><i>12.</i><span>Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M, et al. Stan: A probabilistic programming language. J Stat Softw. 2017; 76(1):1–32.</span></div><div class="ref"><i>13.</i><span>Gelman A, Rubin DB. Inference from iterative simulation using multiple sequences. Stat Sci. 1992; 7(4):457–472.</span></div>
+</div><div class="foot">PLOS Computational Biology | https://doi.org/10.1371/journal.pcbi.1008366 October 26, 2020<span>21 / 21</span></div></div>
+</body></html>

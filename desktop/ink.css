@@ -1,0 +1,159 @@
+/* Handwriting layer and tools. The layer sits above the translation layer and
+   lets every pointer through while the reading tool is active. */
+.app-ink-layer,.app-ink-live{position:absolute;left:0;top:0;width:100%;height:100%;z-index:4;pointer-events:none}
+.app-ink-live{z-index:5}
+body.ink-active .app-ink-layer{pointer-events:auto;touch-action:none}
+/* The writing tool's own shape (set by inkToolbarState); a cross if it fails. */
+body.ink-active :is(.app-ink-layer,.nb-page){cursor:var(--ink-cursor,crosshair)}
+.reader-mode-toolbar>.ink-toolbar{grid-column:1/-1}
+/* The list button and the writing tools share one line (the view switch is
+   in the top bar); in a narrow window the tools move below as a whole. */
+.reader-mode-toolbar:has(>.ink-toolbar){display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px 14px}
+.reader-mode-toolbar:has(>.ink-toolbar)>.ink-toolbar{flex:1 1 auto;padding:0}
+/* Sections of the toolbar: tools | emphasis | colours | thickness | undo,
+   each after a hairline, with room between them. */
+.ink-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:4px 0 0;min-width:0}
+.ink-toolbar>:is(.ink-colors,.ink-sizes,.ink-history){position:relative;padding-left:13px}
+.ink-toolbar>:is(.ink-colors,.ink-sizes,.ink-history)::before{content:"";position:absolute;left:0;top:50%;height:22px;margin-top:-11px;border-left:1px solid var(--line,#e5e8eb)}
+.ink-toolbar .ink-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;min-width:0;padding:0;border-radius:7px;color:#4e5968}
+.ink-toolbar .ink-icon:hover:not(:disabled){background:rgba(27,100,218,.08);color:var(--ink,#191f28)}
+.ink-toolbar .ink-icon .icon{width:18px;height:18px}
+.ink-tools{gap:2px;padding:3px;border-radius:10px}
+.ink-tools .ink-icon.active{background:var(--surface,#fff);color:var(--accent,#1b64da);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+/* Pen and highlighter show the colour they write with, like a pen's tip. */
+.ink-tools .ink-inked{position:relative}
+.ink-tools .ink-inked::after{content:"";position:absolute;left:9px;right:9px;bottom:3px;height:3px;border-radius:2px;background:var(--tool-color)}
+.ink-tools .ink-inked .icon{margin-top:-3px}
+.ink-toolbar .ink-ghost{border:0;background:transparent}
+.ink-history{display:flex;align-items:center;gap:2px}
+.ink-history .ink-icon:disabled{opacity:.35}
+.ink-history [data-ink-touch][aria-pressed="true"]{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da)}
+.ink-tip{position:fixed;z-index:1000;max-width:260px;padding:4px 8px;border-radius:5px;background:#1f2937;color:#fff;font-size:12px;line-height:1.4;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.ink-tip[hidden]{display:none}
+/* Colour swatches: room between them, the chosen one ringed in the accent
+   (a white gap first, so dark colours stay readable). Hovering keeps the
+   colour (the general button hover would paint it pale). */
+.ink-colors{display:flex;align-items:center;gap:8px}
+.ink-color{width:22px;height:22px;border-radius:50%;border:0;background:var(--ink-color);padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);transition:transform .12s,box-shadow .12s}
+.ink-color:hover{background:var(--ink-color);transform:scale(1.12)}
+.ink-color[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface,#fff),0 0 0 4px var(--accent,#1b64da)}
+.ink-toolbar .ink-color-add{width:22px;height:22px;border-radius:50%;border:1.5px dashed #b0b8c1;background:transparent;color:#6b7684}
+.ink-toolbar .ink-color-add .icon{width:14px;height:14px}
+/* Thickness presets: a dot as thick as the line, in the tool's colour. */
+.ink-sizes{display:flex;align-items:center;gap:2px}
+.ink-size{width:30px;height:30px;padding:0;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+.ink-size .ink-dot{width:var(--dot);height:var(--dot);border-radius:50%;background:var(--dot-color,#191f28);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.ink-size[aria-pressed="true"]{background:var(--pale,#e8f3ff);box-shadow:inset 0 0 0 1.5px var(--accent,#1b64da)}
+.ink-size-pop{position:absolute;top:calc(100% + 8px);left:13px;z-index:30;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface,#fff);border:1px solid var(--line,#e5e8eb);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+.ink-size-pop input{width:130px;padding:0;border:0}
+.ink-size-pop output{min-width:28px;font-size:12px;color:var(--muted,#6b7684);font-variant-numeric:tabular-nums}
+.ink-toolbar [aria-pressed="true"].secondary{outline:2px solid #2563eb;outline-offset:-2px}
+.ink-toolbar [data-ink-mark]{border:0;background:transparent}
+/* Only a failed save is told in the tool row (with 다시 시도); saving and saved take no room and say nothing, so the
+   names beside 메모 추가 · 그림 설명 · 주석 추가 stay as long as the tools fit. The element keeps its state
+   (data-state, data-touched) for the app and its tests. */
+.ink-status{font-size:11px;white-space:nowrap}
+.ink-status:not([data-state="failed"]){display:none}
+.ink-status[data-state="failed"]{color:#b42318;font-weight:600}
+/* A hint never widens the line: it takes what room is left and is cut
+   short, down to its mark; its full text shows on hover. */
+.ink-hint{flex:1 1 120px;min-width:24px;contain:inline-size;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ink-hint::before{content:"ⓘ ";color:#2563eb}
+.ink-hint:empty{display:none}
+.ink-base-select{max-width:260px;font-size:12px}
+.translated-pane.viewing-ink-base .page-retranslate,.translated-pane.viewing-ink-base [data-action="gpt-retranslate"],.translated-pane.viewing-ink-base [data-action="gpt-retry"]{display:none}
+.ink-export-choice{display:flex;align-items:center;gap:8px;font-weight:600;margin:4px 0 8px}
+@media (max-width:900px){.ink-toolbar{gap:6px 8px}.ink-toolbar .ink-icon{width:28px;height:26px}.ink-toolbar .ink-icon .icon{width:16px;height:16px}.ink-colors{gap:6px}.ink-color,.ink-toolbar .ink-color-add{width:20px;height:20px}.ink-size{width:26px;height:26px}}
+:is(.ink-selection,.nb-selection){position:absolute;z-index:6;border:1.5px dashed #2563eb;pointer-events:none;border-radius:2px}
+/* The selection's corner handle scales it (the box itself lets the pen through). */
+.ink-selection-actions{position:absolute;left:0;bottom:calc(100% + 6px);display:flex;gap:2px;padding:3px;background:var(--surface,#fff);border:1px solid var(--line,#e5e8eb);border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.14);pointer-events:auto;white-space:nowrap}
+.ink-selection-actions button{padding:4px 9px;border-radius:5px;font-size:12px;color:var(--ink,#191f28)}
+.ink-selection-actions :is([data-ink-selection="delete"],[data-nb-selection="delete"]){color:#c0262d}
+/* A notebook page clips at its edge: near the top the bar goes below the selection. */
+.ink-selection-actions.below{bottom:auto;top:calc(100% + 6px)}
+/* The laser pointer's trail fades out after the pointer lifts. */
+.app-ink-laser{position:absolute;left:0;top:0;width:100%;height:100%;z-index:5;pointer-events:none;transition:opacity .6s ease .2s}
+.app-ink-laser.fading{opacity:0}
+:is(.ink-selection,.nb-selection) .ink-handle{position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #2563eb;pointer-events:auto;cursor:nwse-resize;touch-action:none}
+body.ink-active .app-ink-layer{touch-action:none}
+/* Shape and selection choices open below their button. */
+.ink-group{position:relative;display:inline-flex}
+.ink-group>.ink-icon{position:relative}
+.ink-group>.ink-icon::after{content:"";position:absolute;right:3px;bottom:3px;border:2.5px solid transparent;border-right-color:currentColor;border-bottom-color:currentColor;opacity:.55}
+.ink-flyout{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:7px;box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.ink-flyout .ink-icon.active{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da)}
+body.ink-active:not(.ink-grabbing) :is(.app-ink-layer,.nb-page).ink-over-selection{cursor:grab}
+body.ink-grabbing :is(.app-ink-layer,.nb-page){cursor:grabbing}
+/* Annotations gathered in page order (주석 모아 보기). */
+.annotation-collection{padding-left:20px;max-height:60vh;overflow:auto}
+.annotation-collection li{margin:6px 0;line-height:1.5}
+/* Text box edited in place on the page, with a format bar above it. */
+/* The editor is the box itself (its padding, border and fill are set from the box, transparent without one: inkTextLayout);
+   the blue line that marks it as being edited is an outline outside the box's own border. */
+.ink-text-editor{position:absolute;z-index:6;box-sizing:content-box;outline:1.5px solid #3b82f6;outline-offset:2px;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.ink-text-editor .ink-text-area:focus-visible{outline:none} /* the editor's own outline marks it */
+.ink-text-area{display:block;field-sizing:content;min-width:2ch;min-height:1.3em;margin:0;padding:0;border:0;outline:none;background:transparent;resize:none;overflow:hidden;white-space:pre;caret-color:#3b82f6}
+.ink-text-bar{position:fixed;z-index:70;display:flex;align-items:center;gap:2px;padding:5px 6px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 6px 24px rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.05)}
+.ink-text-bar::after{content:"";position:absolute;left:calc(50% - 7px);width:14px;height:14px;background:inherit;transform:rotate(45deg);box-shadow:2px 2px 3px rgba(0,0,0,.06)}
+.ink-text-bar[data-side="above"]::after{bottom:-6px}
+.ink-text-bar[data-side="below"]::after{top:-6px;box-shadow:-2px -2px 3px rgba(0,0,0,.05)}
+.ink-text-bar>*{position:relative;z-index:1}
+.ink-text-bar button{display:inline-grid;place-items:center;min-width:32px;height:32px;padding:0 6px;border:0;border-radius:8px;background:transparent;color:var(--ink,#191f28);font-size:15px;cursor:pointer}
+.ink-text-bar button:hover{background:var(--hover,#f2f4f6)}
+.ink-text-bar button[aria-pressed="true"]{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da)}
+.ink-text-bar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ink-text-bar .icon{width:19px;height:19px}
+.ink-text-bar .ink-tb-color span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+.ink-text-bar .ink-tb-color span svg{width:16px;height:16px;stroke-width:2.6}
+.ink-text-bar button[aria-expanded="true"]{background:var(--hover,#f2f4f6)}
+.ink-tb-size{width:42px;height:30px;margin:0 4px;padding:0 4px;border:0;border-radius:8px;background:var(--hover,#f2f4f6);color:var(--ink,#191f28);font-size:13px;text-align:center;-moz-appearance:textfield}
+.ink-tb-size::-webkit-inner-spin-button,.ink-tb-size::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.ink-tb-sep{width:1px;height:22px;margin:0 4px;background:var(--line,#e5e8eb)}
+.ink-text-bar .ink-tb-done{min-width:auto;padding:0 10px;font-size:13px;font-weight:600;color:var(--accent,#1b64da)}
+.ink-text-pop{position:fixed;z-index:71;padding:16px 18px 18px;border-radius:16px;background:var(--surface,#fff);box-shadow:0 6px 28px rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.05)}
+/* The tail points at the bar button that opened the panel. */
+.ink-text-pop::after{content:"";position:absolute;left:calc(var(--tail,28px) - 8px);width:16px;height:16px;background:inherit;transform:rotate(45deg)}
+.ink-text-pop[data-side="above"]::after{bottom:-7px;box-shadow:3px 3px 4px rgba(0,0,0,.05)}
+.ink-text-pop[data-side="below"]::after{top:-7px;box-shadow:-3px -3px 4px rgba(0,0,0,.04)}
+.ink-text-pop>*{position:relative;z-index:1}
+.ink-text-pop strong{display:block;margin-bottom:16px;font-size:14px}
+.ink-text-swatches{display:flex;flex-direction:column;gap:18px}
+.ink-text-row{display:grid;grid-template-columns:repeat(5,28px);gap:26px}
+.ink-text-swatches button,.ink-text-custom{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);cursor:pointer}
+.ink-text-swatches button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+/* The chosen colour: a pale ring round it and a check-like chevron inside, as in the picture. */
+.ink-text-swatches button[aria-pressed="true"],.ink-text-custom.chosen{box-shadow:inset 0 0 0 1px rgba(0,0,0,.18),0 0 0 6px #e5e7eb}
+.ink-text-custom{position:relative;overflow:hidden;background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 5px rgba(0,0,0,.12)}
+.ink-text-custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.ink-text-lists{display:flex;flex-direction:column;gap:2px;min-width:200px}
+.ink-text-lists button{display:flex;align-items:center;gap:12px;padding:8px 10px;border:0;border-radius:9px;background:transparent;color:var(--ink,#191f28);font-size:13px;text-align:left;cursor:pointer}
+.ink-text-lists button:hover{background:var(--hover,#f2f4f6)}
+.ink-text-lists button[aria-pressed="true"]{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da);font-weight:600}
+.ink-text-lists svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ink-text-pop p{margin:10px 2px 0;font-size:11px;color:var(--muted,#6b7684)}
+
+/* Over a text box with the reading tool: it opens with a click. */
+body.ink-over-text .translated-pages .page{cursor:text}
+
+/* A text box selected with the reading tool: an outline and × like a notebook box. */
+.ink-text-selected{position:absolute;z-index:6;outline:1.5px solid var(--accent,#1b64da);outline-offset:2px;border-radius:2px;pointer-events:none}
+.ink-text-selected .ink-text-remove{position:absolute;right:-12px;top:-12px;width:18px;height:18px;padding:0;border:0;border-radius:50%;background:var(--surface,#fff);color:var(--ink,#111);box-shadow:0 1px 3px #0004;font-size:12px;line-height:18px;cursor:pointer;pointer-events:auto}
+.ink-text-bar .ink-tb-box span{display:block;width:20px;height:15px;box-sizing:border-box;border-radius:2px}
+.ink-text-bar .ink-tb-box span.none{border:1.5px dashed #adb5bd}
+.ink-box-look{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px 16px}
+.ink-box-look>span{font-size:12px;color:var(--muted,#6b7684)}
+.ink-box-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ink-box-row>button{display:grid;place-items:center;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);cursor:pointer}
+.ink-box-row>.ink-text-custom{width:26px;height:26px}
+.ink-box-row>button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ink-box-row>button[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(0,0,0,.18),0 0 0 4px #e5e7eb}
+.ink-box-row>.ink-text-custom.chosen{box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 5px rgba(0,0,0,.12),0 0 0 4px #e5e7eb}
+.ink-box-row>.ink-box-none{background:linear-gradient(to top right,transparent calc(50% - 1px),#e03131 calc(50% - 1px),#e03131 calc(50% + 1px),transparent calc(50% + 1px)),#fff}
+.ink-box-widths>button,.ink-box-lines>button{display:flex;flex-direction:column;gap:3px;width:auto;min-width:34px;height:30px;padding:4px 6px;border-radius:8px;background:transparent;box-shadow:none;color:var(--ink,#191f28);font-size:11px}
+.ink-box-widths>button i{display:block;width:22px;background:currentColor}
+.ink-box-lines>button i{display:block;width:30px;height:0}
+.ink-box-widths>button:hover,.ink-box-lines>button:hover{background:var(--hover,#f2f4f6)}
+.ink-box-widths>button[aria-pressed="true"],.ink-box-lines>button[aria-pressed="true"]{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da);box-shadow:none}
+.ink-text-bar select.ink-tb-size{width:56px;text-align:left;cursor:pointer}
+/* A text box under the pointer (reading and text tools): the move cursor, as on notebook boxes. */
+body.ink-text-hover .translated-pages .page,body.ink-text-hover .translated-pages .page *{cursor:move!important}

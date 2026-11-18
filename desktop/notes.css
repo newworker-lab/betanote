@@ -1,0 +1,243 @@
+/* Notes: memo cards in the side panel, the field corner, the wide Markdown editor and rendered Markdown. */
+.memo-tab{display:flex;flex-direction:column;gap:8px;min-height:0}
+.memo-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.memo-head button{display:inline-flex;align-items:center;gap:4px}
+.memo-head .icon svg{width:13px;height:13px}
+.memo-list{display:flex;flex-direction:column;gap:8px}
+.memo-card{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:8px 10px;cursor:pointer}
+.memo-card.open{cursor:default;border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.memo-card:not(.open):hover{background:var(--soft)}
+.memo-card-head{display:flex;align-items:center;gap:6px;min-width:0}
+.memo-card-head strong{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memo-card-head small{font-size:10px;flex:none}
+/* An English AI result's name is longer: in a narrow panel the date and buttons go under it instead of cutting it. */
+:root[lang="en"] .insight-card .memo-card-head{flex-wrap:wrap;row-gap:2px}:root[lang="en"] .insight-card .memo-card-head strong{flex:1 0 auto;max-width:100%}
+.memo-actions{display:inline-flex;gap:2px;flex:none}
+.memo-actions .row-more{display:inline-grid;place-items:center;width:24px;height:24px;padding:0}
+.memo-actions .icon svg{width:13px;height:13px}
+.memo-figure{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--pale);flex:none}
+.memo-figure svg{width:13px;height:13px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.memo-preview{margin-top:6px;max-height:96px;overflow:hidden;font-size:12px;color:var(--muted);-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+/* A closed memo: title row, then one line of its text and a thumbnail of its first picture. */
+.memo-card:not(.open){padding:6px 10px}
+.memo-glance{display:flex;align-items:center;gap:8px;margin-top:2px;min-width:0}
+.memo-thumb{flex:none;width:34px;height:26px;object-fit:cover;border-radius:4px;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.memo-line{flex:1;min-width:0;font-size:12px;color:var(--muted);line-height:1.5}
+.memo-line>*{margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.memo-line .katex{font-size:1em}
+.memo-line .md-image{display:none}
+/* An open memo: the corner resizes it. */
+.note-box.resize-only .note-grip{cursor:nwse-resize}
+.note-box.resize-only .note-grip::before{display:none}
+.note-box.resize-only .note-grip .icon{opacity:.55}
+.note-box.resize-only:hover .note-grip{background:transparent;color:var(--accent);cursor:nwse-resize}
+.memo-card.open .note-box{margin-top:6px}
+/* A field with its own corner: drag for height; the corner shows ⤢ on hover and opens the wide editor. */
+.note-box{position:relative}
+.note-box textarea{display:block;width:100%;resize:none;min-height:60px;font-family:var(--kn-font-notes,inherit)}
+.memo-card.open .note-box textarea{min-height:180px}
+.note-grip{position:absolute;z-index:3;right:3px;bottom:3px;width:18px;height:18px;padding:0;border:0;border-radius:5px;background:transparent;cursor:ns-resize;display:grid;place-items:center;color:var(--muted)}
+.note-grip::before{content:"";position:absolute;right:3px;bottom:3px;width:8px;height:8px;border-right:2px solid var(--line);border-bottom:2px solid var(--line)}
+.note-grip .icon{opacity:0}
+.note-grip .icon svg{width:12px;height:12px}
+.note-box:hover .note-grip{background:var(--pale);color:var(--accent);cursor:pointer}
+.note-box:hover .note-grip::before{opacity:0}
+.note-box:hover .note-grip .icon{opacity:1}
+/* The wide editor: resizable, toolbar on top, Markdown on the left and its rendering on the right. */
+.note-editor-dialog{width:min(1100px,94vw);height:min(760px,90vh);max-width:98vw;max-height:96vh;resize:both;overflow:hidden}
+.note-editor-dialog .dialog-inner{height:100%;display:flex;flex-direction:column;box-sizing:border-box}
+.md-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+.md-tool{display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--ink);cursor:pointer}
+.md-tool:hover{background:var(--hover)}
+.md-tool .icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.md-sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.md-view{margin-left:auto}
+.md-view button{padding:4px 10px;font-size:11px}
+.note-editor-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.note-editor-body[data-view="edit"]{grid-template-columns:1fr}
+.note-editor-body[data-view="preview"]{grid-template-columns:1fr}
+.note-editor-body[data-view="edit"] .note-editor-preview,.note-editor-body[data-view="preview"] textarea{display:none}
+#note-editor{height:100%;resize:none;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,"Noto Sans KR",monospace;padding:12px}
+.note-editor-preview{color:var(--ink);font-size:14px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:12px 16px;background:var(--surface)}
+/* Rendered Markdown. */
+.md{line-height:1.6;overflow-wrap:anywhere;font-family:var(--kn-font-notes,inherit)}
+.md>:first-child{margin-top:0}
+.md h2,.md h3,.md h4{margin:.9em 0 .4em;line-height:1.3}
+.md h2{font-size:1.3em}.md h3{font-size:1.15em}.md h4{font-size:1.02em}
+.md p{margin:.5em 0}
+.md ul,.md ol{margin:.4em 0;padding-left:1.4em}
+.md li.md-task{list-style:none;margin-left:-1.2em}
+.md blockquote{margin:.5em 0;padding:.1em .9em;border-left:3px solid var(--line);color:var(--muted)}
+.md code{padding:.1em .35em;border-radius:4px;background:var(--hover);font-size:.92em}
+.md pre{padding:10px 12px;border-radius:8px;background:var(--hover);overflow:auto}
+.md pre code{padding:0;background:none}
+.md mark{background:#fff1a8;color:inherit;border-radius:2px;padding:0 .1em}
+body.dark .md mark{background:#6b5a12}
+.md table{border-collapse:collapse;margin:.6em 0;font-size:.95em}
+.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+.md th{background:var(--soft)}
+.md hr{border:0;border-top:1px solid var(--line);margin:1em 0}
+.md a{color:var(--accent)}
+.md .md-math{overflow-x:auto;overflow-y:hidden;padding:2px 0}
+.md .md-math-error,.md .md-math-source{color:#c0392b}
+:is(.md,.md-live) .md-figure{display:inline-flex;align-items:center;gap:6px;margin:.2em 0 .5em;padding:3px 10px 3px 6px;border-radius:999px;background:var(--pale);color:var(--accent);font-size:.9em;font-weight:600}
+:is(.md,.md-live) .md-figure svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.note-editor-preview p,.note-editor-preview li{color:inherit;font-size:inherit}
+/* Memo titles, the source badge (figure / AI explanation with a link back to its page). */
+.memo-title{flex:1;min-width:0;border:0;border-bottom:1px solid transparent;border-radius:0;background:transparent;padding:2px 0;font-size:13px;font-weight:700;color:var(--ink)}
+.memo-title:hover{border-bottom-color:var(--line)}
+.memo-title:focus{outline:none;border-bottom-color:var(--accent)}
+.memo-card-head strong.untitled{color:var(--muted);font-weight:600}
+.editor-title{display:block;flex:none;height:auto;min-height:0;width:100%;margin:0 0 8px;font-size:18px;padding:4px 2px}
+.memo-source{display:inline-flex;align-items:center;gap:2px;flex:none;height:22px;padding:0 5px;border:0;border-radius:6px;background:var(--pale);color:var(--accent);cursor:pointer}
+span.memo-source{cursor:default}
+.memo-source svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.memo-source:hover{filter:brightness(.96)}
+:is(.md,.md-live) .md-source-link{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:2px;border-radius:5px;color:inherit}
+:is(.md,.md-live) .md-source-link:hover{background:color-mix(in srgb,var(--accent) 15%,transparent)}
+.md .md-image{margin:.5em 0;text-align:center}
+.md .md-image img{max-width:100%;max-height:420px;border-radius:6px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.memo-preview .md-image img{max-height:120px}
+.md .md-image figcaption{font-size:.85em;color:var(--muted);margin-top:4px}
+/* Live view (CodeMirror): marks rendered in place, the one under the cursor as source. */
+.note-editor-body[data-view="live"]{grid-template-columns:1fr}
+.note-editor-body[data-view="live"] textarea#note-editor,.note-editor-body[data-view="live"] .note-editor-preview,.note-editor-body:not([data-view="live"]) .md-live{display:none}
+.md-live{min-height:0;overflow:hidden;display:flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);cursor:text}
+.md-live:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.md-live .cm-editor{flex:1;min-width:0;height:100%;outline:none;font-size:14px}
+.md-live .cm-scroller{overflow:auto;padding:12px 16px;line-height:1.7;font-family:var(--kn-font-notes,inherit)}
+.md-live .cm-content{caret-color:var(--ink);padding:0}
+.md-live .cm-line{padding:0}
+.md-live .cm-selectionBackground,.md-live .cm-focused .cm-selectionBackground{background:color-mix(in srgb,var(--accent) 22%,transparent)!important}
+.md-live .cm-cursor{border-left-color:var(--ink)}
+.md-live .cm-h1{font-size:1.45em;font-weight:700}.md-live .cm-h2{font-size:1.25em;font-weight:700}.md-live .cm-h3{font-size:1.1em;font-weight:700}
+/* A list line hangs: its marker takes --li-mark (a bullet about 1em, as in the reading view), the wrapped lines start under
+   the item's first letter. The source marker (cursor on the line) takes at least the same room, right-aligned, so it sits
+   one space before the text (its indent spaces fall in the depth's room, not added to it); a wider one ("- [ ] ")
+   pushes the text a little rather than leaving a gap. */
+.md-live .cm-line.cm-li{padding-left:calc(var(--li-indent) + var(--li-mark));text-indent:calc(-1 * var(--li-mark))}
+.md-live .cm-list-mark{display:inline-block;width:var(--li-mark);text-indent:0;color:var(--muted);font-variant-numeric:tabular-nums}.md-live .cm-list-mark input{margin:0;vertical-align:-.1em}
+.md-live .cm-list-src{display:inline-block;min-width:calc(var(--li-indent) + var(--li-mark));margin-left:calc(-1 * var(--li-indent));text-indent:0;white-space:pre;text-align:right;color:var(--muted)}
+.md-live .cm-strong{font-weight:700}.md-live .cm-em{font-style:italic}.md-live .cm-strike{text-decoration:line-through}
+.md-live .cm-mark{background:#fff1a8;border-radius:2px}body.dark .md-live .cm-mark{background:#6b5a12}
+.md-live .cm-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:var(--hover);border-radius:4px;padding:0 .2em}
+.md-live .cm-math{padding:0 1px;border-radius:4px;cursor:text}
+.md-live .cm-math:hover{background:var(--hover)}
+.md-live .cm-math-block{display:block;text-align:center;padding:4px 0;overflow-x:auto}
+.md-live .cm-math-source,.md-live .cm-math-source-line{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.md-live .cm-image{display:block;text-align:center;margin:4px 0}
+.md-live .cm-image img{max-width:100%;max-height:380px;border-radius:6px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.md-live .cm-source{margin:2px 0;line-height:1.4;vertical-align:middle}
+.memo-card.flash{animation:annotation-flash 1.6s ease}
+/* The formula under the cursor, rendered just below it while typing. */
+.math-peek{position:fixed;z-index:80;max-width:min(560px,90vw);overflow-x:auto;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 6px 20px rgba(0,0,0,.14);pointer-events:none}
+/* Saving is silent; the status shows only when a save failed (it then holds a retry button). */
+.saved:not(:has(button)){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* Side panel fields: the live editor shows; its textarea stays as the (hidden) saved source. */
+.note-box textarea.live-source{position:absolute;inset:0 auto auto 0;width:1px;height:1px;min-height:0;opacity:0;pointer-events:none;overflow:hidden;padding:0;border:0}
+.note-box .field-live{min-height:78px;height:auto;max-height:none;resize:none;border-radius:10px}
+.memo-card.open .note-box .field-live{min-height:140px}
+.note-box .field-live .cm-scroller{padding:8px 10px;line-height:1.6}
+.note-box .field-live .cm-editor{font-size:12px}
+body.large .note-box .field-live .cm-editor{font-size:15px}
+.note-box .field-live .cm-placeholder{color:var(--muted)}
+.md-live .cm-math-block{font-size:1em}
+.memo-ai-mode{width:max-content;margin-bottom:8px}.memo-ai-mode button:disabled{opacity:.45;cursor:default}
+.memo-ai-check{display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0 4px}.memo-ai-quote{margin:0 0 10px;padding:6px 10px;border-left:3px solid var(--line);color:var(--muted);max-height:6em;overflow:auto}
+.memo-actions .memo-ai-button{color:var(--accent)}
+.memo-ai-presets{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.memo-ai-preview{max-height:55vh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.memo-actions .row-more.active{color:var(--accent)}
+.memo-card.open .memo-card-head .memo-title{min-width:60px}
+.note-window{display:flex;flex-direction:column;padding:12px 16px!important;overflow:hidden!important}.note-window .note-editor-body{min-height:0}
+.note-ai{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--surface);max-height:45%;overflow:auto;flex-shrink:0}
+.note-ai-head{display:flex;align-items:center;gap:10px}.note-ai-head .memo-ai-mode{margin:0;flex-shrink:0}.note-ai-head .memo-ai-hint{flex:1;margin:0}
+.note-ai .model-pair{margin:6px 0 0}.note-ai-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px}
+.md-toolbar .md-ai{color:var(--accent)}.md-toolbar .md-ai.active{background:var(--hover)}
+.rules-images{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 4px}.rules-image-list{display:contents}
+.rules-image{position:relative;margin:0;width:72px;height:72px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}.rules-image img{width:100%;height:100%;object-fit:cover}
+.rules-image [data-rules-image-remove]{position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px #0003;line-height:1}
+/* An open memo's head: the title shrinks first, then the icons wrap below it instead of spilling past the card. */
+.memo-card.open .memo-card-head{flex-wrap:wrap;row-gap:2px}
+.memo-card.open .memo-card-head .memo-title{flex:1 1 80px}
+.memo-card.open .memo-card-head .memo-actions{flex-wrap:wrap;justify-content:flex-end;margin-left:auto;max-width:100%}
+/* The question box: attached pictures on top, the text, then attach (+) on the left and send on the right. */
+.note-ai-composer{margin:8px 0 6px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:6px 8px}
+.note-ai-composer:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.note-ai-composer textarea{display:block;width:100%;box-sizing:border-box;border:0;outline:0;background:transparent;resize:none;min-height:2.6em;padding:4px 2px;box-shadow:none}
+.note-ai-composer .memo-ai-image-list{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px}.note-ai-composer .memo-ai-image-list:empty{display:none}
+.note-ai-composer .rules-image{width:56px;height:56px}
+.note-ai-composer-bar{display:flex;align-items:center;justify-content:space-between}
+.composer-icon{display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.composer-icon:hover:not(:disabled){background:var(--hover);color:var(--ink)}.composer-icon:disabled{opacity:.4;cursor:default}
+.composer-icon .icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.composer-send{margin-left:auto;color:var(--accent)}.composer-icon[hidden]{display:none}
+.note-ai-head [data-editor-ai-close]{margin-left:auto;flex:none}
+/* Under the question box: the presets on the left, the 연결·모델 chip on the right. */
+.note-ai-under{display:flex;align-items:flex-start;gap:8px;margin:0 0 6px}.note-ai-under .memo-ai-presets{flex:1;min-width:0;margin:0}
+.note-ai-chip{flex:none;display:inline-flex;align-items:center;gap:6px;max-width:60%;height:28px;padding:0 6px 0 10px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-size:12px;cursor:pointer;white-space:nowrap}
+.note-ai-chip:hover,.note-ai-chip[aria-expanded="true"]{background:var(--hover)}
+.note-ai-chip-model{font-weight:600;overflow:hidden;text-overflow:ellipsis}.note-ai-chip-connection{color:var(--muted);overflow:hidden;text-overflow:ellipsis}.note-ai-chip-connection:empty{display:none}
+.note-ai-chip .icon svg{width:14px;height:14px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.note-ai-menu{position:fixed;z-index:30;display:flex;flex-direction:column;min-width:220px;max-width:min(360px,90vw);max-height:min(360px,70vh);overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16)}
+.note-ai-menu-group{padding:8px 10px 4px;font-size:11px;font-weight:600;color:var(--muted)}
+.note-ai-menu button{display:flex;align-items:center;gap:8px;padding:7px 10px;border:0;border-radius:6px;background:transparent;color:var(--ink);font-size:12px;text-align:left;cursor:pointer}
+.note-ai-menu button span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-ai-menu button:hover,.note-ai-menu button:focus-visible{background:var(--hover);outline:none}.note-ai-menu button.active{font-weight:600}
+.note-ai-menu-check{color:var(--accent)}
+.note-ai-menu>p{margin:4px 10px;font-size:11px;color:var(--muted)}.note-ai-menu .note-ai-menu-notice{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+/* 주석 cards: the page link, then the memo cards' tools (넓게 편집 · 휴지통) at the right. */
+.annotation-head{display:flex;align-items:center;gap:6px;white-space:normal}.annotation-head .memo-actions{margin-left:auto}
+/* An AI tab result read large or in a window: AI and window tools, the AI panel, then the result. */
+.insight-view{display:flex;flex-direction:column;min-height:0}
+.insight-view-tools{flex:none;justify-content:flex-start;margin-bottom:8px}
+.insight-view .note-ai{margin:0 0 8px;max-height:none}
+.insight-window{overflow:auto!important}.insight-window .insight-wide{font-size:13px}
+.insight-follow{margin:6px 0 10px;padding:8px 10px;border-left:3px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:var(--soft);border-radius:0 8px 8px 0}
+/* 연결·모델 as a chip in every dialog (modelField), right under what it serves. */
+.model-chip-row{display:flex;justify-content:flex-end;margin:4px 0 8px}
+.figure-controls .model-chip-row{margin:0}
+/* The translation's requests: the memo AI's question box. */
+.translation-rules{margin:10px 0 0}.translation-rules-head{font-size:13px;margin-bottom:4px}
+.translation-rules .note-ai-composer{margin:4px 0}.translation-rules .rules-image{width:56px;height:56px}
+.insight-ask.note-ai-composer{display:flex;align-items:center;gap:4px;padding:2px 4px 2px 10px}.insight-ask.note-ai-composer input{flex:1;min-width:0;border:0;outline:0;background:transparent;box-shadow:none;padding:6px 0}
+.translation-rules+.model-chip-row{margin-top:2px}
+
+/* 그림 설명: the memo AI's question box and model chip, the AI tab's answer card. */
+.figure-dialog .figure-composer{margin:8px 0 4px}
+#figure-result .figure-answer{margin-top:4px;cursor:default}
+#figure-result .figure-answer .insight-body{max-height:none}
+#figure-result .figure-answer blockquote{margin:2px 0 6px}
+
+/* Memo order: the sort menu in the head and the drop line while a memo is dragged. */
+.memo-head .memo-sort{height:24px;min-height:0;padding:0 4px;font-size:12px;border-radius:6px;margin-left:auto;max-width:150px}
+.memo-card.dragging{opacity:.45}
+.memo-card.drop-before{box-shadow:0 -2px 0 0 var(--accent)}
+.memo-card.drop-after{box-shadow:0 2px 0 0 var(--accent)}
+.figure-dialog .figure-under{display:block;margin-bottom:4px}
+.figure-dialog .figure-under .model-chip-row{margin:0}
+.memo-head .memo-new-icon{display:inline-grid;place-items:center;width:26px;height:26px;padding:0;flex:none}
+/* 주석 tab: the figure box and underline switches, then 모아 보기 at the right, together on one line; where the count
+   beside them does not fit (a narrow side menu, English), it takes the line above (it keeps at least 96px beside them,
+   wrapping by words). Each switch: the icon of what it shows and a track whose knob slides right when it is on. */
+.annot-tab .memo-head{flex-wrap:wrap;row-gap:6px}
+.annot-tab .memo-head>span:first-child{flex:1 1 96px;min-width:96px;overflow-wrap:anywhere}
+.annot-tools{display:inline-flex;align-items:center;gap:4px;flex:none;margin-left:auto}
+.annot-tools .mark-toggle{display:inline-flex;align-items:center;gap:3px;padding:2px 3px;border-radius:6px;color:var(--muted);flex:none}
+.annot-tools .mark-toggle .icon svg{width:15px;height:15px}
+.mark-switch{position:relative;width:26px;height:15px;border-radius:999px;background:#c9cdd2;transition:background .15s;flex:none}
+body.dark .mark-switch{background:#4e5968}
+.mark-switch>span{position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.annot-tools .mark-toggle[aria-pressed="true"]{color:var(--accent)}
+.mark-toggle[aria-pressed="true"] .mark-switch{background:var(--accent)}
+.mark-toggle[aria-pressed="true"] .mark-switch>span{transform:translateX(11px)}
+
+/* 주석 tab: the memo cards, with the page they belong to in front. */
+.annot-page{display:inline-flex;align-items:center;gap:2px;font-size:11px;white-space:nowrap}
+.annot-page svg{width:13px;height:13px}
+.annot-quote{margin:6px 0 2px;padding-left:8px;border-left:3px solid var(--line);font-size:12px;color:var(--muted);max-height:6em;overflow:auto}
+.annot-counts{color:var(--muted)}
+.annot-status:empty{display:none}
+.annot-status{margin:2px 0 0}
+.memo-card.annotation{border-bottom:1px solid var(--line);white-space:normal;padding:6px 10px}
+.memo-card.annotation.open{padding:8px 10px}

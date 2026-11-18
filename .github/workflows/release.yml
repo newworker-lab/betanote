@@ -1,0 +1,58 @@
+name: Build and attach desktop release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install build tools
+        run: npm ci --ignore-scripts
+      - name: Test storage
+        run: npm test
+      - name: Check third-party notices
+        run: npm run notices -- --check
+      - name: Build Linux and Windows portable apps
+        run: |
+          npm run package
+          npm run package:win
+      - name: Test packaged Linux app
+        run: npm run test:desktop
+      - name: Archive packages and checksums
+        env:
+          APP_RELEASE_VERIFICATION: 'Linux packaged app tested (npm run test:desktop); Windows packaged, runtime not tested'
+        run: python3 scripts/archive.py
+      - name: Create release and upload files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          name="$(node -p "require('./core/app-name.json').name")"
+          id="$(node -p "require('./core/app-name.json').id")"
+          tag="v${version}"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+            echo "Tag and package version do not match" >&2
+            exit 1
+          fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "${name} ${version}" --notes-file release/RELEASE-NOTES.md
+          fi
+          gh release upload "$tag" "release/${id}-${version}-windows-x64.zip" "release/${id}-${version}-linux-x64.tar.gz" release/SHA256SUMS.txt --clobber

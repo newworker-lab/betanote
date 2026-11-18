@@ -1,0 +1,10 @@
+{
+  "name": "βnote",
+  "product": "BetaNote",
+  "id": "betanote",
+  "citekeyPrefix": "beta",
+  "history": [
+    { "name": "Papi Note", "product": "Papi Note", "id": "papinote", "citekeyPrefix": "papi" },
+    { "name": "knote", "product": "knote", "id": "knote", "citekeyPrefix": "knote" }
+  ]
+}

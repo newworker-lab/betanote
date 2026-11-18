@@ -1,0 +1,803 @@
+/* Library and citation dialogs. */
+.bibliography-dialog .dialog-inner{max-width:760px}
+.bib-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.bibliography-form textarea{width:100%}
+.doi-conflict{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line,#e5e7eb);font-size:13px}
+.doi-conflict span{overflow-wrap:anywhere}
+.cite-preview{padding:8px 10px;border:1px solid var(--line,#e5e7eb);border-radius:6px;font-size:13px;line-height:1.5;user-select:text;overflow-wrap:anywhere}
+.cite-preview p{margin:0 0 6px;padding-left:2em;text-indent:-2em}
+@media (max-width:640px){.doi-conflict{grid-template-columns:1fr}}
+.collection-node{padding-left:calc(12px + var(--depth,0) * 14px)}
+.saved-search-row{display:flex;align-items:center}
+.saved-search-row .nav-btn{flex:1;min-width:0}
+.saved-search-delete{border:0;background:none;color:inherit;opacity:.6;padding:0 6px}
+.saved-search-delete:hover{opacity:1}
+/* The filter row: 전체 선택 at its start, the status filter in the middle, PDF 본문 검색 (a switch)
+   and the sort order at its end. */
+.select-all,.fulltext-toggle{display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer}
+.select-all input{margin:0;width:16px;height:16px}
+.filters-end{display:inline-flex;align-items:center;gap:12px}
+/* The English filter row is longer: in a narrow library it goes on to a second line. */
+:root[lang="en"] .filters{flex-wrap:wrap;row-gap:8px}
+input.switch{appearance:none;-webkit-appearance:none;position:relative;flex:none;width:30px;height:18px;margin:0;border:0;border-radius:9px;background:color-mix(in srgb,var(--muted) 45%,transparent);cursor:pointer;transition:background .15s}
+input.switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.3);transition:transform .15s}
+input.switch:checked{background:var(--primary)}
+input.switch:checked::after{transform:translateX(12px)}
+/* The selection bar's place is kept by an empty element while nothing is selected: it shows nothing. */
+.batch-bar[hidden]{display:none}
+.fulltext-hit{font-size:12px;color:#536171;margin:4px 0 0;overflow-wrap:anywhere}
+.batch-check{align-self:start;margin:2px 0 0;width:16px;height:16px}
+/* A row with the batch checkbox gains a column for it; the badge, text and
+   star keep their own columns, and a full-text hit sits under the text. */
+.paper-item:has(>.batch-check){grid-template-columns:16px minmax(0,1fr) auto 20px}
+.paper-item:has(>.batch-check)>.batch-check{grid-column:1;grid-row:1}
+.paper-item:has(>.batch-check)>div{grid-column:2;grid-row:1}
+.paper-item:has(>.batch-check)>.fulltext-hit{grid-column:2;grid-row:2}
+.paper-item:has(>.batch-check)>.read-progress{grid-column:3;grid-row:1}
+.paper-item:has(>.batch-check)>.star{grid-column:4;grid-row:1}
+/* Library rows: the title leads, the checkbox and star line up with it, less empty height. */
+.paper-item{padding:14px 12px;gap:12px;align-items:start}
+.paper-item h3{font-size:14px;line-height:1.45;margin:0 0 3px}
+body.large .paper-item h3{font-size:17px}
+.paper-item>div>p{font-size:12px;margin:0 0 8px}
+.paper-item>.star{line-height:20px}
+/* The bar over the list while items are selected: the count, then the controls grouped (files ·
+   sorting · bibliography · AI) with a hairline after each group, and removal at the far end.
+   - Three columns: count | controls | removal. The controls wrap inside their own column, so every
+     further row starts under the first control. A group is not a box (display:contents): its controls
+     flow on, and the last one carries the group's space and hairline to its right, so a row never
+     starts with a gap or a line.
+   - It stays at the top of the list while the list scrolls (the library section scrolls): it rises
+     through the section's top padding (--library-pad, app.css) and stops against the section's top
+     edge, so no row shows above it and it covers nothing while the list is at its start.
+   - Colours are the theme's own (surface, line, ink), so it follows the dark mode. */
+.batch-bar{position:sticky;top:calc(-1*var(--library-pad,25px));z-index:5;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;column-gap:12px;padding:6px 10px;margin:0 0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgb(0 0 0/.08);font-size:13px}
+.batch-count{display:inline-flex;align-items:center;gap:8px;height:28px;white-space:nowrap}
+.batch-clear{border:0;background:none;padding:0;min-height:0;height:auto;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer}
+.batch-clear:hover{color:var(--ink)}
+.batch-groups{display:flex;flex-wrap:wrap;align-items:center;gap:6px 4px}
+.batch-group{display:contents}
+.batch-pick-wrap{display:inline-flex}
+.batch-group>:last-child{position:relative;margin-right:13px}
+.batch-group>:last-child::after{content:'';position:absolute;right:-9px;top:5px;bottom:5px;border-left:1px solid var(--line);pointer-events:none}
+.batch-groups>.batch-group:last-child>:last-child{margin-right:0}
+.batch-groups>.batch-group:last-child>:last-child::after{content:none}
+.batch-end{display:inline-flex;align-items:center}
+.batch-bar button.secondary.small,.batch-bar select.batch-pick{box-sizing:border-box;height:28px;min-height:0;margin:0;padding:0 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:12.5px;line-height:1;white-space:nowrap;cursor:pointer}
+.batch-bar select.batch-pick{width:auto;min-width:0;padding:0 20px 0 8px;max-width:150px}
+.batch-bar button.secondary.small:hover,.batch-bar select.batch-pick:hover{background:var(--hover)}
+.batch-bar button.secondary.small.danger{color:#c92a2a;border-color:color-mix(in srgb,#c92a2a 35%,transparent)}
+.dark .batch-bar button.secondary.small.danger{color:#ff8a80}
+.batch-bar button.secondary.small.danger:hover{background:color-mix(in srgb,#c92a2a 10%,transparent)}
+.outline-list{display:flex;flex-direction:column;max-height:60vh;overflow:auto}
+.outline-item{text-align:left;border:0;background:none;padding:4px 8px 4px calc(8px + var(--depth,0) * 16px);color:inherit}
+.outline-item:hover{background:rgba(37,99,235,.08)}
+.sidebar>.vault-tags,.sidebar>.vault-heading{flex-shrink:0}
+/* AI tab: drafts with checked evidence. */
+.insight-actions,.insight-ask{display:flex;gap:6px;margin:6px 0}
+.insight-ask input{flex:1;min-width:0}
+.insight-status{font-size:13px}.insight-status.error{color:#b42318}
+.insight-card h4{margin:8px 0 2px;font-size:12px}
+.insight-card ul{margin:0;padding-left:16px}.insight-card li{margin:3px 0}
+.insight-card li.unsupported{color:#8a4b00}
+.insight-card footer,.insight-wide footer{display:flex;gap:6px;margin-top:6px}
+.insight-card blockquote{margin:4px 0;padding-left:8px;border-left:3px solid var(--line,#e5e7eb)}
+.basis{font-size:11px;padding:0 4px;border-radius:4px;background:#e0e7ff;color:#1e3a8a}.basis.model{background:#fef3c7;color:#92400e}
+.evidence{font-size:11px;padding:0 5px;margin-left:2px;border:1px solid #93c5fd;border-radius:9px;background:#eff6ff;color:#1d4ed8}
+.ai-evidence{position:absolute;z-index:6;outline:3px solid rgba(37,99,235,.8);background:rgba(37,99,235,.12);border-radius:3px;pointer-events:none}
+/* Translation result quality and corrections. */
+.translation-quality{border:0;background:none;font-size:12px;color:#536171;padding:0 4px;cursor:pointer;text-align:left}
+.translation-quality .quality-missing,.translation-quality .quality-review{color:#b42318;font-weight:600}
+.translation-quality .quality-corrected{color:#047857}
+.quality-list{max-height:30vh;overflow:auto;font-size:13px;padding-left:16px}
+.correction-source{white-space:pre-wrap;max-height:20vh;overflow:auto;font-size:13px}
+#correction-text{width:100%}
+.translated-pane .translated-block[data-block-id]{cursor:text}
+/* Notebook beside the paper. */
+.notebook-pane{display:flex;flex-direction:column;min-height:0}
+.notebook-pane header{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.nb-select{max-width:220px}:root[lang="en"] .nb-select{min-width:0;max-width:min(220px,100%)}
+.nb-status{font-size:12px;color:#536171}
+.nb-body{flex:1;min-height:0;display:flex;flex-direction:column}
+/* The tool row is the PDF pane's tool row in size and ground (style.css .pdf-pane-tools), so the two
+   panes' pages begin on one line. */
+.nb-tools{display:flex;gap:6px;align-items:center;box-sizing:border-box;height:56px;min-height:56px;flex:0 0 56px;padding:8px 10px;border-bottom:1px solid var(--line,#e5e7eb);background:var(--soft);min-width:0;overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+/* The page spans the pane from its left edge, as the PDF pages do (style.css). */
+.nb-pages{flex:1;overflow:auto;padding:2px 0 0;background:#e5e7eb}
+/* Zoom 1 fits the pane (up to 820px); a larger zoom scrolls sideways. */
+.nb-page-wrap{width:calc(min(100%,820px) * var(--nb-zoom,1));margin:0 auto 12px} /* the PDF pages' own gap */
+/* A page carries no row of controls: its ⋯ sits at the top right corner (clear of the paper's
+   writing area, shown stronger under the pointer). The page number is in the tool row. */
+.nb-page-wrap{position:relative}
+.nb-page-more{position:absolute;top:6px;right:6px;z-index:3;width:26px;height:26px;border-radius:6px;background:color-mix(in srgb,var(--surface) 82%,transparent);color:var(--muted);box-shadow:0 0 0 1px var(--line);opacity:.55;transition:opacity .12s}
+.nb-page-wrap:hover .nb-page-more,.nb-page-more:focus-visible,.nb-page-more[aria-expanded="true"]{opacity:1;color:var(--ink)}
+/* The page field looks as the PDF pane's does, under its own names: the PDF's is found by class and filled from its own pages. */
+.nb-page-nav{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin:0 6px;padding:0 6px;border-left:1px solid var(--line)}
+.nb-page-total{font-size:12px;color:var(--muted);white-space:nowrap}
+.nb-page-input{width:40px;height:26px;padding:2px 4px;border:1px solid var(--line);border-radius:5px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:12px;text-align:center}
+/* The tool row: the things put on a page, a hairline, then 페이지 추가. */
+.nb-tools-sep{width:1px;height:18px;margin:0 4px;background:var(--line)}
+/* 페이지 추가 and a page's menu. A swatch shows each form as the paper draws it. */
+.nb-swatch{display:inline-block;flex:none;width:22px;height:28px;border:1px solid var(--line);border-radius:3px;background:#fff}
+.nb-swatch[data-template="lined"]{background:#fff repeating-linear-gradient(to bottom,transparent 0 5px,#c7d2fe 5px 6px)}
+.nb-swatch[data-template="grid"]{background:#fff;background-image:linear-gradient(#c7d2fe 1px,transparent 1px),linear-gradient(90deg,#c7d2fe 1px,transparent 1px);background-size:5px 5px}
+.nb-add-menu{min-width:220px;padding:6px}
+.nb-new-templates{display:flex;gap:6px;padding:2px 8px 8px}
+.nb-new-template{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px 6px;border:1px solid var(--line);border-radius:8px;font-size:12px;cursor:pointer;position:relative}
+.nb-new-template input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.nb-new-template:has(input:checked){border-color:var(--primary);background:var(--pale);color:var(--accent)}
+.nb-new-template:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.nb-new-size{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 8px 8px;font-size:12px;color:var(--muted)}
+.nb-new-size select{flex:1;height:28px;padding:0 6px;border-radius:6px;font-size:12px}
+/* The + under the last page (notebook.js nbAddSameHtml). */
+/* The + under the last page: a strip just tall enough for it (40px) is all the room under the last page, and the +
+   sits in the middle of that room; it shows only when the list is scrolled to its end (.nb-at-end, nbPageNav) or the +
+   has the focus. A last page shorter than the view gets more room (--nb-end-space) so that it can reach the top of the
+   view, and the + stays in the middle of it. */
+.nb-page-wrap:last-of-type{margin-bottom:0}
+.nb-add-more{position:relative;z-index:6;display:flex;justify-content:center;align-items:center;height:calc(40px + var(--nb-end-space,0px));margin:0;pointer-events:none}
+.nb-add-more .nb-add-same{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.92);color:#4e5968;box-shadow:0 1px 4px rgba(0,0,0,.18);opacity:0;transform:translateY(6px);transition:opacity .16s ease,transform .16s ease}
+.nb-add-more .nb-add-same .icon{width:16px;height:16px}
+.nb-at-end .nb-add-more .nb-add-same,.nb-add-more .nb-add-same:focus-visible{opacity:1;transform:none;pointer-events:auto}
+.nb-at-end .nb-add-more .nb-add-same:hover:not(:disabled){color:var(--accent,#1b64da);background:#fff}
+.nb-add-more .nb-add-same:disabled{opacity:.45;cursor:not-allowed}
+.nb-add-more .nb-add-same:disabled:not(:focus-visible){opacity:0}.nb-at-end .nb-add-more .nb-add-same:disabled{opacity:.45}
+@media (prefers-reduced-motion:reduce){.nb-add-more .nb-add-same{transition:none}}
+.nb-new-board{display:flex;align-items:center;gap:6px;padding:0 8px 8px;font-size:12px;color:var(--ink)}
+.pop-menu .nb-new-go{margin:0 8px 6px;text-align:center;background:var(--primary);color:#fff;font-weight:600}
+.pop-menu .nb-new-go:hover{background:var(--primary-hover,var(--primary))}
+.nb-add-menu hr,.nb-page-menu hr{width:100%;margin:4px 0;border:0;border-top:1px solid var(--line)}
+.nb-page-menu button{display:flex;align-items:center;gap:8px}
+.nb-page-menu .nb-swatch{width:14px;height:18px}
+.nb-page-menu [aria-checked="true"]{color:var(--accent);font-weight:600}
+.nb-page-menu button:disabled{opacity:.4}
+.nb-page{position:relative;width:100%;aspect-ratio:595/842;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);container-type:inline-size;overflow:hidden}
+body.ink-active .nb-page{touch-action:none}
+.nb-page[data-template="lined"]{background:#fff repeating-linear-gradient(to bottom,transparent 0,transparent calc(100cqw*24/var(--nb-w,595) - 1px),#c7d2fe calc(100cqw*24/var(--nb-w,595) - 1px),#c7d2fe calc(100cqw*24/var(--nb-w,595))) 0 calc(100cqw*72/var(--nb-w,595))/100% calc(100% - 100cqw*108/var(--nb-w,595)) no-repeat}
+.nb-page[data-template="grid"]{background:#fff;background-image:linear-gradient(#e0e7ff 1px,transparent 1px),linear-gradient(90deg,#e0e7ff 1px,transparent 1px);background-size:calc(100cqw*18/var(--nb-w,595)) calc(100cqw*18/var(--nb-w,595))}
+.nb-ink{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
+/* A whiteboard draws its ink on a band around the view (notebook.js nbBand): the canvas and a gesture's preview take its place. */
+.nb-page[data-board] .nb-ink{bottom:auto}
+.nb-band{position:absolute;left:0;width:100%;z-index:5;pointer-events:none}
+.nb-item{position:absolute;z-index:2;box-sizing:border-box;margin:0}
+.nb-text textarea{width:100%;height:100%;resize:none;border:0 solid transparent;border-radius:0;outline:1px dashed transparent;outline-offset:1px;background:transparent;font:inherit;font-size:calc(var(--nb-size,12) * 100cqw / var(--nb-w,595));line-height:1.4;padding:2px;box-sizing:border-box}
+.nb-image img{width:100%;height:calc(100% - 100cqw*14/var(--nb-w,595));object-fit:contain;display:block}
+.nb-image figcaption{height:calc(100cqw*14/var(--nb-w,595));line-height:calc(100cqw*14/var(--nb-w,595));overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.nb-image figcaption,.nb-card{font-size:calc(9 * 100cqw / var(--nb-w,595))}
+.nb-card{border:1px solid #93c5fd;border-radius:6px;background:#eff6ff;padding:4px;overflow:hidden}
+.nb-card q{display:block;margin-top:2px;color:#334155}
+.nb-source-link{border:0;background:none;color:#1d4ed8;padding:0;text-align:left;cursor:pointer;font:inherit}
+.nb-resize{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,#94a3b8 50%)}
+.nb-remove{position:absolute;right:-1px;top:-1px;border:0;background:#f1f5f9;border-radius:0 0 0 6px;font-size:12px;line-height:1;padding:2px 5px;opacity:0}
+.nb-item:hover .nb-remove,.nb-item:focus-within .nb-remove{opacity:1}
+/* The grip, corner and × stay usable with a pen or highlighter chosen and while a text is edited. */
+.nb-text.editing .nb-remove{opacity:1}
+body.ink-active .nb-item :is(.nb-resize,.nb-remove){pointer-events:auto}
+body.ink-active .nb-item :is(.nb-resize,.nb-remove):hover{opacity:1}
+body.ink-active .nb-item{pointer-events:none}
+body:not(.ink-active) .nb-item{cursor:move}
+/* Device sync and conflicts. */
+.sync-section{border:1px solid var(--line,#e5e7eb);border-radius:8px;padding:8px 10px;margin:10px 0}
+.sync-conflict{border-top:1px solid var(--line,#e5e7eb);padding:6px 0;font-size:13px}
+.sync-versions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0}
+.sync-versions p{margin:2px 0 4px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto;background:var(--panel,#f8fafc);padding:4px}
+.sync-join{padding:0 18px;font-size:13px}
+/* In the translated view the PDF's own text layer sits under the translation:
+   selection and copy take the translated words only. */
+.translated-pane .native-pdf .textLayer{user-select:none;-webkit-user-select:none}
+.compare-dialog .dialog-inner{max-width:min(1100px,96vw)}
+.compare-scroll{overflow:auto;max-height:60vh}
+.compare-table{border-collapse:collapse;font-size:13px;min-width:100%}
+.compare-table th,.compare-table td{border:1px solid var(--line,#e5e7eb);padding:6px;vertical-align:top;text-align:left}
+.compare-table td.unsupported{background:#fffbeb}
+/* Citation card: the reference entry a pointed-at citation names. */
+.cite-card{position:fixed;z-index:1000;max-width:420px;max-height:50vh;overflow:auto;padding:10px 12px;background:var(--surface,#fff);color:var(--ink,#191f28);border:1px solid var(--line,#e5e8eb);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.16);font-size:12px;line-height:1.5}
+.cite-entry+.cite-entry{margin-top:8px;padding-top:8px;border-top:1px solid var(--line,#e5e8eb)}
+.cite-entry p{margin:0 0 6px}
+/* Page thumbnails beside the original (쪽 button). */
+.original-pane{position:relative}
+.page-thumbs{position:absolute;left:0;bottom:0;z-index:7;width:128px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff);border-right:1px solid var(--line,#e5e8eb);box-shadow:2px 0 6px rgba(0,0,0,.06)}
+.page-thumbs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px;border:2px solid transparent;border-radius:6px;background:none;font-size:11px;color:var(--muted,#6b7684)}
+.page-thumbs button.current{border-color:var(--accent,#1b64da);color:var(--accent,#1b64da)}
+.page-thumbs canvas{width:100px;height:auto;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+
+
+/* A long library list lays out and paints only the rows near the screen. */
+.paper-list>.paper-item{content-visibility:auto;contain-intrinsic-size:auto 92px}
+
+/* Read status: three buttons beside the paper; the list pill cycles on click. */
+.read-status{display:inline-flex}
+.read-status button{padding:6px 12px}
+.read-status button[aria-checked="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.08);color:var(--accent);font-weight:600}
+.status-pill{border:0;cursor:pointer;font:inherit;font-size:11px;padding:3px 8px;line-height:normal}
+.status-pill[data-status="읽기 전"]{background:var(--hover);color:var(--muted)}
+.status-pill[data-status="읽는 중"]{background:#fff3d6;color:#8c5200}
+.status-pill[data-status="완독"]{background:#e3f6ea;color:#17703a}
+body.dark .status-pill[data-status="읽는 중"]{background:#453316;color:#ffd68a}
+body.dark .status-pill[data-status="완독"]{background:#1d3a28;color:#8fe0ae}
+.status-pill:hover{filter:brightness(.95);outline:1px solid currentColor}
+
+/* Collections beside the paper: chips toggle membership, Enter in the box creates one. */
+.collection-hint{font-size:10px;color:var(--muted);font-weight:400;margin-left:4px}
+.collection-chips{display:flex;flex-wrap:wrap;gap:6px}
+.collection-chip{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11px;background:var(--surface);color:var(--muted);max-width:100%;overflow-wrap:anywhere;text-align:left}
+.collection-chip[aria-pressed="true"]{background:var(--pale);border-color:var(--accent);color:var(--accent);font-weight:600}
+.collection-parent{opacity:.7;font-weight:400}
+.collection-quick{width:100%;margin-top:8px;padding:7px 10px;font-size:11px}
+
+/* Dragging papers: the sidebar collections become drop targets. */
+.paper-item[draggable="true"]{-webkit-user-drag:element}
+body.dragging-papers :is(.collection-node,.tag-item){outline:1px dashed var(--accent);outline-offset:-2px}
+:is(.collection-node,.tag-item).drop-target{background:var(--pale);color:var(--accent);outline:2px solid var(--accent)}
+.paper-drag-label{position:fixed;top:-100px;left:0;max-width:260px;padding:6px 10px;border-radius:6px;background:var(--accent);color:#fff;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* The sidebar's views, as in VS Code: opened views share the height between
+   the fixed top (vault, 전체 자료) and bottom (저장소 관리, 설정), with a
+   handle between two of them; each scrolls on its own; folded ones sit at the bottom. */
+/* When even the folded headings do not fit (a very short window), the whole sidebar scrolls. */
+#navigation-panel{overflow:auto}
+.sidebar-views{flex:1 1 auto;min-height:min-content;display:flex;flex-direction:column;margin:12px -6px 0;overflow:hidden}
+.sidebar-view{display:flex;flex-direction:column;min-height:0;flex:none}
+.sidebar-view.open{min-height:64px}
+.sidebar-view.first-closed{margin-top:auto}
+.sidebar-view:not(.open){border-top:1px solid var(--line)}
+.view-heading{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:4px 6px 4px 4px;font-size:12px;color:var(--muted)}
+.view-heading button{display:inline-flex;align-items:center;justify-content:center;padding:4px;border-radius:4px;color:var(--muted)}
+.view-heading button:hover{background:var(--pale);color:var(--accent)}
+.view-heading .icon{width:15px;height:15px}
+.view-heading .section-toggle{flex:1;min-width:0;justify-content:flex-start;gap:6px;font-size:12px;font-weight:600;text-align:left}
+.view-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.view-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.section-toggle .count{font-size:10px;color:var(--muted);font-weight:400}
+.section-caret{display:inline-block;width:0;height:0;border-left:4px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;margin:0 2px;transition:transform .15s}
+.section-toggle[aria-expanded="true"] .section-caret{transform:rotate(90deg)}
+.sidebar-view-body{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 6px}
+.sidebar-view-body .vault-tree{flex:none;min-height:0;max-height:none;overflow:visible;margin:0 -6px}
+.sidebar-view-body .collection-tree,.sidebar-view-body .saved-search-list{max-height:none;overflow:visible}
+.view-sash{flex:none;height:7px;margin:-3px 0;position:relative;z-index:2;cursor:row-resize;touch-action:none}
+.view-sash::after{content:"";position:absolute;left:6px;right:6px;top:3px;border-top:1px solid var(--line)}
+.view-sash:hover::after,.view-sash:focus-visible::after,.view-sash.dragging::after{border-top:2px solid var(--accent);top:2px}
+.view-sash:focus-visible{outline:none}
+#navigation-panel .sidebar-bottom{flex-shrink:0;margin-top:0;border-top:1px solid var(--line)}
+.section-empty{margin:4px 8px}
+
+/* Tags: label · name · count rows, a ⋯ menu on hover, a search box once there are more than five. */
+.view-heading .tag-current{display:inline-flex;justify-content:flex-start;align-items:center;gap:5px;max-width:50%;padding:2px 8px;border-radius:999px;background:var(--pale);color:var(--accent);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag-row[hidden],.tag-empty[hidden],.tag-assign-row[hidden]{display:none}
+.tag-search{display:block;width:100%;padding:4px 9px;font-size:12px;position:sticky;top:0;z-index:1;margin-bottom:2px;box-shadow:0 0 0 3px var(--surface)}
+/* Focus shows inside the box, so it stays within the sidebar's margins. */
+.tag-search:focus,.tag-search:focus-visible{outline:none;border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px var(--surface)}
+.tag-list{margin:0 -4px;padding:0 4px}
+.tag-row{display:flex;align-items:center;position:relative}
+.tag-row .nav-btn{flex:1;min-width:0;gap:8px;padding:3px 26px 3px 10px;margin:0;font-size:12px;line-height:1.5}
+.tag-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-more{position:absolute;right:2px;width:22px;height:20px;padding:0;border-radius:5px;color:var(--muted);opacity:0;line-height:1}
+.tag-row:hover .tag-more,.tag-more:focus-visible,.tag-row:focus-within .tag-more{opacity:1}
+.tag-row:hover .count,.tag-row:focus-within .count{visibility:hidden}
+.tag-more:hover{background:var(--pale);color:var(--accent)}
+.tag-empty{margin:6px 8px}
+.tag-icon{width:15px;height:11px;flex-shrink:0;fill:var(--tag)}
+.tag-icon[data-color=""]{fill:#c9ced6}
+body.dark .tag-icon[data-color=""]{fill:#d5d9de}
+.tag-swatch{width:16px;height:16px;flex-shrink:0;padding:0;border-radius:50%;border:2px solid var(--tag);background:var(--tag)}
+.tag-swatch[data-color=""]{--tag:var(--line);background:transparent;border-style:dashed}
+.tag-swatch:hover,.tag-swatch:focus-visible{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.pill.tag-pill{background:color-mix(in srgb,var(--tag) 16%,var(--surface));color:var(--tag-ink)}
+body.dark .pill.tag-pill{background:color-mix(in srgb,var(--tag) 30%,var(--surface));color:var(--tag-ink-dark)}
+.tag-more-pill{border:0;cursor:pointer;font:inherit;font-size:10px;line-height:normal}
+.tag-more-pill:hover{outline:1px solid currentColor}
+.tag-color-menu{position:fixed;z-index:20;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16);width:200px}
+.tag-menu-title{margin:0 0 8px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-menu-colors{display:grid;grid-template-columns:repeat(5,22px);gap:8px;justify-content:start}
+.tag-menu-colors .tag-swatch{width:22px;height:22px}
+:is(.tag-menu-colors,.new-tag-colors) .tag-swatch[aria-checked="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.tag-menu-label{margin:10px 0 6px;font-size:10px;color:var(--muted)}
+.tag-menu-custom{display:flex;align-items:center;gap:6px;margin-top:10px}
+.tag-color-picker{width:30px;height:28px;padding:2px;flex-shrink:0;cursor:pointer}
+.tag-color-hex{flex:1;min-width:0;width:0;padding:5px 7px;font-size:12px;font-family:ui-monospace,monospace}
+.tag-color-hex[aria-invalid="true"]{border-color:#e5484d}
+.tag-menu-clear{margin-top:10px;width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:11px}
+.tag-menu-clear[aria-checked="true"]{border-color:var(--accent);color:var(--accent)}
+.tag-menu-actions{display:flex;flex-direction:column;margin:8px -10px -10px;padding:4px 0;border-top:1px solid var(--line)}
+.tag-menu-actions button{text-align:left;padding:7px 12px;font-size:12px;border-radius:0}
+.tag-menu-actions .danger{color:#d93025}
+.new-tag-colors{display:flex;flex-direction:column;gap:6px}
+#new-tag-name,#tag-rename{width:100%}
+.new-tag-colors>.tag-swatch{width:22px;height:22px}
+dialog .primary.danger{background:#d93025}
+.tag-assign-list{max-height:min(40vh,320px);overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:4px}
+.tag-assign-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;cursor:pointer}
+.tag-assign-row:hover{background:var(--hover)}
+.tag-partial{margin-left:auto;font-size:10px;color:var(--muted)}
+.tag-assign-create{display:block;width:100%;margin-top:6px;padding:7px 10px;border:1px dashed var(--accent);border-radius:6px;color:var(--accent);text-align:left;font-size:12px}
+.tag-assign-create[hidden]{display:none}
+#tag-assign-search{width:100%}
+.undo-toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:14px;padding:10px 12px 10px 18px;border-radius:9px;background:#333d4b;color:#fff;font-size:12px;box-shadow:0 5px 20px rgba(0,0,0,.2)}
+.undo-toast button{color:#90c2ff;font-weight:600;padding:4px 8px;border-radius:6px}
+.undo-toast button:hover{background:rgba(255,255,255,.1)}
+/* The collections switch in the top bar shows whether the feature is on. */
+.feature-toggle[aria-pressed="true"]{background:var(--pale);color:var(--accent);border-color:var(--accent)}
+
+/* Reader: the read status at the right end of the PDF tool row; renderer.js
+   picks the layout from the room there (inline, inline-compact, top, top-compact). */
+.reader-mode-toolbar:has(>.reader-status){display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px 14px}
+.reader-mode-toolbar>.ink-toolbar{order:2}
+.reader-mode-toolbar>.reader-status{order:3;margin-left:auto;display:flex;align-items:center;flex:none}
+.reader-mode-toolbar[data-status-layout^="top"]>.reader-status{order:1}
+.reader-mode-toolbar[data-status-layout^="top"]>.ink-toolbar{flex-basis:100%}
+.reader-status .read-status button{padding:5px 10px;font-size:11px}
+/* 주석 추가: its own group left of the read status, set off by a thin line. */
+.reader-status{gap:10px}
+.reader-annotate{display:flex;align-items:center;padding-right:10px;border-right:1px solid var(--line)}
+/* 그림 설명 and 주석 추가 are drawn like the writing tools beside them: the same icon size, button
+   height, corner, colour and hover. (Their labels share one size and weight: both are .pdf-tool.) */
+.reader-annotate .pdf-tool{white-space:nowrap;height:30px;padding:0 8px;gap:6px;border-radius:7px;color:#4e5968}
+.reader-annotate .pdf-tool>.icon{width:18px;height:18px}
+.reader-annotate .pdf-tool:hover{background:rgba(27,100,218,.08);color:var(--ink,#191f28)}
+.reader-mode-toolbar[data-status-layout$="compact"] .reader-annotate .pdf-tool-label,.reader-annotate.icon-only .pdf-tool-label{display:none}
+.reader-mode-toolbar[data-status-layout$="compact"] .reader-annotate .pdf-tool,.reader-annotate.icon-only .pdf-tool{width:32px;padding:0;justify-content:center}
+.reader-mode-toolbar[data-status-layout$="compact"] .reader-status{gap:6px}
+.reader-mode-toolbar[data-status-layout$="compact"] .reader-annotate,.reader-annotate.icon-only{gap:0;padding-right:6px}
+.reader-status-compact{display:inline-flex;align-items:center;gap:4px;padding:5px 7px 5px 9px;font-size:11px}
+.status-caret{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.status-menu{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:120px;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16)}
+.status-menu button{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;font-size:12px;text-align:left}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:currentColor}
+/* Each choice in the colours of its status button; the current one with the button's background too. */
+.status-menu [data-status="읽기 전"]{color:var(--muted)}
+.status-menu [data-status="읽는 중"]{color:#8c5200}
+.status-menu [data-status="완독"]{color:#17703a}
+body.dark .status-menu [data-status="읽는 중"]{color:#ffd68a}
+body.dark .status-menu [data-status="완독"]{color:#8fe0ae}
+.status-menu button:hover,.status-menu button:focus-visible{background:var(--hover);outline:none}
+.status-menu button[aria-checked="true"]{font-weight:600}
+.status-menu button[data-status="읽기 전"][aria-checked="true"]{background:var(--hover)}
+.status-menu button[data-status="읽는 중"][aria-checked="true"]{background:#fff3d6}
+.status-menu button[data-status="완독"][aria-checked="true"]{background:#e3f6ea}
+body.dark .status-menu button[data-status="읽는 중"][aria-checked="true"]{background:#453316}
+body.dark .status-menu button[data-status="완독"][aria-checked="true"]{background:#1d3a28}
+
+/* The tag editor beside a paper looks like the sidebar's tags: label · name chips,
+   and a suggestion list of label · name · count rows in the app's font. */
+.tag-editor .tag-edit{display:flex;flex-wrap:wrap;gap:6px}
+.tag-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 4px 3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:12px}
+.tag-chip .tag-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-chip button{border:0;background:none;color:var(--muted);padding:0 4px;border-radius:4px;line-height:1.2}
+.tag-chip button:hover{background:var(--hover);color:var(--ink)}
+.tag-add{position:relative}
+.tag-suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:15;max-height:240px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.tag-suggest[hidden]{display:none}
+.tag-suggest-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12px;color:var(--ink);cursor:pointer}
+.tag-suggest-item .tag-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-suggest-item .count{font-size:10px;color:var(--muted)}
+.tag-suggest-item:hover{background:var(--hover)}
+.tag-suggest-item[aria-selected="true"]{background:var(--pale);color:var(--accent)}
+.tag-suggest-new{color:var(--accent)}
+.tag-suggest-new .icon{width:14px;height:14px}
+
+/* Attachments: one row per file — a click opens it; ⋯ holds the rest. */
+.item-attachments .row.between{align-items:center;margin-bottom:6px}
+.item-attachments h3{margin:0;display:flex;align-items:center;gap:6px}
+.item-attachments h3 .count{font-size:11px;font-weight:400;color:var(--muted)}
+.item-attachments [data-action="attach-pdf"]{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.item-attachments [data-action="attach-pdf"] .icon{width:14px;height:14px}
+.attachment-list{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.item-attachments .attachment-row{flex-wrap:nowrap;gap:4px;padding:2px 4px 2px 2px;border-bottom:1px solid var(--line)}
+.item-attachments .attachment-row:last-child{border-bottom:0}
+.item-attachments .attachment-open{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex:1;min-width:0;padding:7px 8px;border-radius:6px;text-align:left}
+.item-attachments .attachment-open:hover:not(:disabled){background:var(--hover)}
+.item-attachments .attachment-open>span:not(.icon){min-width:0;flex:1;text-align:left}
+.attachment-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.item-attachments .attachment-row small{display:block;font-size:10px;color:var(--muted);margin-top:1px}
+.item-attachments .attachment-row.missing .attachment-name{color:var(--muted)}
+.row-more{flex-shrink:0;width:28px;height:28px;padding:0;border-radius:6px;color:var(--muted);font-size:16px;line-height:1}
+.row-more:hover,.row-more[aria-expanded="true"]{background:var(--pale);color:var(--accent)}
+/* The paper's title with its ⋯ (merge, trash). */
+.item-title{display:flex;align-items:flex-start;gap:4px}
+.item-title>:is(h2,h3){flex:1;min-width:0}
+.item-title .item-more{margin-top:10px}
+.reader-panel .item-title .item-more{margin-top:-4px}
+.pop-menu{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:190px;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16)}
+.pop-menu button{padding:8px 12px;border-radius:5px;font-size:12px;text-align:left;white-space:nowrap}
+.pop-menu button:hover,.pop-menu button:focus-visible{background:var(--hover);outline:none}
+.pop-menu .danger{color:#d93025}
+/* The bibliography's heading: its buttons stay whole and move below the heading when the panel is narrow. */
+.bib-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.bib-head h3{margin:0;white-space:nowrap}
+.bib-head .row{gap:4px;flex-wrap:wrap}
+.bib-head button,.item-attachments .row.between button{white-space:nowrap}
+
+/* The paper's collections: a footer pinned to the bottom of the right panel, like 저장소 관리·설정 on the left. */
+:is(.detail,.reader-panel):has(>.collection-footer){display:flex;flex-direction:column;padding-bottom:0}
+:is(.detail,.reader-panel):has(>.collection-footer)>*{flex-shrink:0}
+.collection-footer{position:sticky;bottom:0;z-index:3;margin-top:auto;padding:10px 0 12px;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 8px -6px rgba(0,0,0,.08)}
+.collection-footer-head{display:flex;align-items:center;gap:6px;font-size:12px}
+.collection-footer-head .icon{width:15px;height:15px;color:var(--muted)}
+.collection-footer-head .count{font-size:10px;color:var(--muted);margin-right:auto}
+.collection-footer-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;max-height:64px;overflow:auto}
+.collection-footer .collection-chip{display:inline-flex;align-items:center;gap:2px;padding:2px 2px 2px 9px;border:1px solid var(--accent);border-radius:999px;background:var(--pale);color:var(--accent);font-size:11px;font-weight:600;max-width:100%}
+.collection-footer .collection-chip button{border:0;background:none;color:inherit;padding:0 6px;border-radius:999px;line-height:1.4;font-weight:400}
+.collection-footer .collection-chip button:hover{background:rgba(27,100,218,.12)}
+.collection-picker{position:fixed;z-index:20;width:250px;display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.collection-picker input{width:100%;padding:6px 9px;font-size:12px}
+.picker-list{max-height:min(40vh,280px);overflow:auto;display:flex;flex-direction:column}
+.picker-row{display:flex;align-items:center;gap:7px;padding:6px 8px 6px calc(8px + var(--depth,0) * 14px);border-radius:6px;font-size:12px;text-align:left}
+.picker-row:hover,.picker-row:focus-visible{background:var(--hover);outline:none}
+.picker-row[aria-checked="true"]{color:var(--accent);font-weight:600}
+.picker-row .icon{width:14px;height:14px}
+.picker-check{width:12px;flex-shrink:0;text-align:center}
+.picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker-empty{margin:6px}
+
+/* File tree: the same triangle as the section headings; a folder lights up as a drop target. */
+.folder-caret{display:inline-flex;align-items:center;justify-content:center;height:24px;border-radius:4px}
+.folder-caret[aria-expanded="true"] .section-caret{transform:rotate(90deg)}
+body.dragging-papers .vault-row[data-folder-drop]{outline:1px dashed var(--line);outline-offset:-2px}
+.vault-row.drop-target{background:var(--pale);color:var(--accent);outline:2px solid var(--accent)!important;outline-offset:-2px}
+/* 즐겨찾기 has the list's star. */
+.nav-star svg{fill:none;stroke:#a15c07}
+body.dark .nav-star svg{stroke:#e0a85a}
+
+/* LLM settings: drag the corner to make it wider or narrower; one folding section per way of connecting. */
+/* The settings dialog scrolls inside itself: the dialog keeps its rounded corners whole and its width handle alone in
+   the lower right corner, and a thin scroll bar runs between the corners, never into them. */
+dialog.llm-dialog{resize:horizontal;overflow:hidden;min-width:420px;max-width:calc(100vw - 40px)}
+dialog.llm-dialog[open]{display:flex;flex-direction:column}
+dialog.llm-dialog>.dialog-inner{flex:1 1 auto;min-height:0;max-width:none;overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#c5ccd3 transparent;margin:14px 5px 18px 0;padding:14px 13px 10px 28px}
+dialog.llm-dialog .llm-section{border-top:1px solid var(--line);padding-top:0;margin-top:0}
+dialog.llm-dialog .llm-section:first-of-type{border-top:0}
+.llm-section>summary{display:flex;align-items:center;gap:8px;padding:14px 0;cursor:pointer;list-style:none}
+.llm-section>summary::-webkit-details-marker{display:none}
+.llm-section>summary h3{margin:0;font-size:15px}
+.llm-section>summary small{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
+.llm-section[open]>summary .section-caret{transform:rotate(90deg)}
+.llm-body{padding-bottom:16px}
+.api-url{margin:2px 0 6px;overflow-wrap:anywhere}
+.provider-add{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:8px}
+.provider-add p{margin:4px 0 8px}
+.danger-text{color:#d93025}
+
+/* Model choice: the connection on the left, its models on the right. */
+.model-pair{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:10px}
+.model-pair>div{min-width:0}
+.model-pair label{display:block}
+.model-pair select{width:100%}
+/* Top search: results under the box first; Enter or 전체 검색 opens the whole list. */
+.search-pop{position:fixed;z-index:60;max-height:min(70vh,520px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:6px}
+.search-hit{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--ink)}
+.search-hit:hover,.search-hit.active{background:var(--pale)}
+.search-hit-title{font-size:13px;font-weight:600;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.search-hit-title mark{background:#fff1b8;color:inherit;border-radius:2px}
+.search-hit-meta{font-size:11px;color:var(--muted)}
+.search-hit-tags{color:var(--accent)}
+.search-none{margin:8px 10px;font-size:12px;color:var(--muted)}
+.search-pop-foot{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+.search-all{display:inline-flex;align-items:center;gap:6px;background:none;border:0;border-radius:8px;padding:6px 10px;font-size:12px;color:var(--accent);cursor:pointer}
+.search-all:first-child{flex:1}
+.search-all:hover{background:var(--hover)}
+.search-all .icon svg{width:14px;height:14px}
+.search-all kbd{margin-left:auto;font-size:10px;color:var(--muted)}
+.search-banner{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 12px;border-radius:10px;background:var(--pale);font-size:12px}
+.search-banner .icon svg{width:14px;height:14px}
+.search-banner button{margin-left:auto}
+/* 그림 설명 from the screen: a crosshair layer over the pages and a hint bar. */
+.figure-capture{position:fixed;z-index:55;cursor:crosshair;overflow:hidden;background:rgba(0,0,0,.4)}
+/* While dragging, the page shows through the box only; the shadow darkens the rest. */
+.figure-capture.dragging{background:transparent}
+.figure-capture-box{position:absolute;border:1px solid #fff;border-radius:2px;pointer-events:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+.figure-crop-dialog{width:min(760px,94vw)}
+.figure-crop-dialog .dialog-inner{height:auto;max-height:90vh;overflow:auto}
+.figure-crop{display:grid;place-items:center;min-height:120px;max-height:52vh;overflow:auto;margin:10px 0;padding:12px;border-radius:12px;background:var(--reader-bg)}
+.figure-crop img{max-width:100%;max-height:48vh;object-fit:contain;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.figure-capture-hint{position:fixed;z-index:56;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap}
+.figure-capture-hint button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45)}
+.figure-capture-hint button:hover{background:rgba(255,255,255,.14)}
+/* Right-click menu on selected text. */
+.ink-text-menu{position:fixed;z-index:70;min-width:150px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.ink-text-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:0;border-radius:7px;background:none;font-size:12px;color:var(--ink);cursor:pointer;text-align:left}
+.ink-text-menu button:hover,.ink-text-menu button:focus-visible{background:var(--pale);outline:none}
+.ink-text-menu .icon svg{width:15px;height:15px}
+/* File annotations on the source page: a pin; the quoted text lights up while the pin is hovered. */
+.annotation-marks{position:absolute;inset:0;pointer-events:none;z-index:4}
+/* 그림 영역 상자·주석 밑줄 (ink.js): dashed, the figure pin's blue and the annotation pin's orange; the width is set per page. */
+.annotation-marks .figure-box{position:absolute;box-sizing:border-box;border-style:dashed;border-color:var(--accent);pointer-events:none}
+.annotation-marks .annotation-underline{position:absolute;height:0;box-sizing:content-box;border:0;border-bottom-style:dashed;border-bottom-color:#ffb020;pointer-events:none}
+.annotation-span{position:absolute;border-radius:2px;background:rgba(255,176,32,.28);opacity:0;transition:opacity .12s}
+.annotation-span.show{opacity:1}
+.annotation-pin{position:absolute;width:20px;height:20px;padding:2px;border:0;border-radius:6px;background:#ffb020;color:#fff;cursor:pointer;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.25);display:grid;place-items:center}
+.annotation-pin:hover{background:#e08a00}
+.annotation-pin .icon svg{width:14px;height:14px;stroke:#fff}
+.annotation-pin.figure-pin{background:var(--accent)}
+.annotation-pin.figure-pin:hover{background:color-mix(in srgb,var(--accent) 80%,#000)}
+.annotation.flash{animation:annotation-flash 1.6s ease}
+@keyframes annotation-flash{0%,60%{background:var(--pale)}100%{background:transparent}}
+/* List rows: exceptions on the second line, reading progress left of the star. */
+.paper-item p .file-flag{font-size:10px;padding:1px 6px;margin-right:2px;vertical-align:1px}
+.paper-item p .file-flag:not(.amber){background:var(--hover);color:var(--muted)}
+.read-progress{margin-top:3px;display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.read-progress .bar{width:44px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.read-progress .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.read-progress.done .bar i{background:#2f9e5b}
+.reader-mode-toolbar[data-status-layout="top-compact"] [data-action="back"] .back-label{display:none}
+.reader-mode-toolbar [data-action="back"]{gap:6px}
+/* Folder ⋯: shown while the row is hovered or focused. */
+.vault-row{position:relative}
+.vault-row .folder-more{position:absolute;right:4px;top:50%;transform:translateY(-50%);opacity:0;padding:0 6px;height:22px;border-radius:6px}
+.vault-row:is(:hover,:focus-within) .folder-more,.vault-row .folder-more[aria-expanded="true"]{opacity:1}
+/* Settings → 모양. The settings and cost notices keep the built-in colours whatever a theme sets. */
+.kn-snippets{border:0;padding:0;margin:4px 0 8px;display:flex;flex-direction:column;gap:4px}
+.kn-snippets legend{font-size:12px;font-weight:600;margin-bottom:4px}
+#dialog.llm-dialog{--bg:#f2f4f6;--surface:#fff;--ink:#191f28;--muted:#6b7684;--line:#e5e8eb;--accent:#1b64da;--primary:#1b64da;--primary-hover:#1957c2;--pale:#e8f3ff;--soft:#f9fafb;--hover:#f2f4f6;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif}
+body.dark #dialog.llm-dialog{--bg:#17171c;--surface:#202027;--ink:#f2f4f6;--muted:#b0b8c1;--line:#36363c;--accent:#90c2ff;--primary:#1b64da;--primary-hover:#1957c2;--pale:#23354c;--soft:#282830;--hover:#2c2c35}
+/* Text actions: shortcut keys on the right; as a bar over a fresh selection they sit in one row. */
+.ink-text-menu kbd{margin-left:auto;padding:0 5px;border:1px solid var(--line);border-radius:4px;font:10px/16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);background:var(--soft)}
+/* + on the colour bar: colours used lately, then the system picker. */
+/* 번역 요청 사항 in the translation window: folded until there is something. */
+/* Side panel tabs: the same space between every two tabs and before 서지 and after AI.
+   Two empty items at the ends take part in space-between, so the ends get the same share. */
+.reader-panel>.tabs{gap:10px;padding:0;justify-content:space-between}
+.reader-panel>.tabs::before,.reader-panel>.tabs::after{content:'';flex:0 0 0}
+/* A page taken from a PDF: its picture under the boxes and the ink. */
+.nb-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
+.nb-size{font-size:12px}
+/* Notebook text boxes: moved like a picture; a double click edits them (with the format bar). */
+/* Being edited or pointed at shows as an outline outside the box's own border (nbTextStyle), never instead of it. */
+.nb-text:not(.editing) textarea{pointer-events:none;cursor:move;user-select:none}
+body:not(.ink-active) .nb-text:not(.editing):hover textarea{outline-color:#cbd5e1}
+.nb-text.editing textarea{outline:1px solid var(--accent);cursor:text}
+/* A picture without a caption (pasted) fills its box. */
+.nb-image:not(:has(figcaption)) img{height:100%}
+/* Notebook tools as icons (names on hover). */
+.nb-tools{align-items:center;gap:4px}
+.nb-tools .nb-tool{width:30px;height:30px;padding:0;justify-content:center}
+.nb-tools .nb-tool .icon svg{width:17px;height:17px}
+/* Notebook bars: the page buttons (복제 ↑ ↓ 삭제, 페이지 추가, PDF에서 가져오기) as small as the
+   choice boxes beside them, one height for the whole row. */
+.nb-page-tools select,.nb-page-tools button,.nb-tools select,.nb-tools button.secondary{box-sizing:border-box;height:24px;min-height:0;font-size:12px;line-height:1;border-radius:6px}
+.nb-page-tools select,.nb-tools select{padding:0 4px}
+.nb-page-tools button,.nb-tools button.secondary{padding:0 9px}
+.nb-page-tools button[data-nb-page="up"],.nb-page-tools button[data-nb-page="down"]{width:24px;padding:0}
+/* AI results as memo cards: closed = title and one line, open = the whole result in a box with a
+   corner that changes its height. ⓘ beside 선택 설명 holds the note about results. */
+.insight-results{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.insight-card{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:6px 10px;font-size:13px;cursor:pointer}
+.insight-card:not(.open):hover{background:var(--soft)}
+.insight-card.open{padding:8px 10px;cursor:default;border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.insight-card .memo-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insight-box{margin-top:6px}
+.insight-body{max-height:340px;min-height:80px;overflow:auto;padding:0 4px 18px 0;box-sizing:border-box}
+.insight-body>p:first-child,.insight-wide>p:first-child{margin-top:0}
+.insight-actions{align-items:center;position:relative}
+.insight-info{display:inline-flex}
+.insight-info-button{display:inline-grid;place-items:center;width:24px;height:24px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:help}
+.insight-info-button:hover,.insight-info.open .insight-info-button{color:var(--accent);background:var(--pale)}
+.insight-info-button .icon{width:18px;height:18px}.insight-info-button .icon svg{width:18px;height:18px;stroke-width:2}
+.insight-info-tip{display:none;position:absolute;z-index:20;left:0;right:0;top:calc(100% + 6px);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:12px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.insight-info:hover .insight-info-tip,.insight-info:focus-within .insight-info-tip,.insight-info.open .insight-info-tip{display:block}
+.insight-wide-dialog{width:min(860px,92vw);max-width:96vw}
+.insight-wide{max-height:70vh;overflow:auto;font-size:14px;line-height:1.6}
+.insight-wide h4{margin:12px 0 4px}
+.insight-wide blockquote{margin:6px 0;padding-left:10px;border-left:3px solid var(--line)}
+.insight-card.open:focus{outline:none}
+/* Welcome: the two ways in sit side by side with one height and a gap. */
+.welcome-hero{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.welcome-hero h1{flex-basis:100%;margin:15px 0 22px}
+.welcome-hero>button{margin:0;height:48px}
+/* The screen language on the start screen: small, at the right of the logo row, so nothing below moves. */
+.welcome-language{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.welcome-language .icon{width:16px;height:16px}
+.welcome-language select{font-size:12px;padding:5px 8px;border-radius:7px}
+/* Library header: the actions read as one compact toolbar, below the title on a narrow window. */
+.library-title{flex-wrap:wrap;gap:12px}
+.library-title>.row{flex-wrap:wrap;gap:6px}
+.library-title>.row>button{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;font-size:13px}
+.library-title>.row>button .icon{width:16px;height:16px}
+@media(max-width:600px){.library-title>.row>.primary{font-size:11px;padding:0 9px}}
+
+/* Recent vaults on the first screen: a remove button at the end of each row. */
+.recent-row{display:flex;align-items:center;gap:6px;padding-right:8px;border-top:1px solid var(--line);border-radius:8px;outline:2px solid transparent;outline-offset:-2px}
+.recent-row:hover{background:var(--hover)}
+/* The row is one target: its focus ring goes round the open button and the remove button together. */
+.recent-row:has(.recent-item:focus-visible){outline-color:var(--accent)}
+.recent-row .recent-item{flex:1;min-width:0;border-top:0;padding:14px 8px;align-items:center;outline:none;background:transparent}
+.recent-item .recent-where{display:block;font-size:11px;font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-row .recent-item strong{margin:0;font-size:13px;line-height:1.4}
+.recent-row .recent-item>span:last-child{display:inline-flex;align-items:center;gap:4px;line-height:1}
+.recent-row .recent-item>span:last-child .icon{width:14px;height:14px}
+.recent-remove{flex:none;width:30px;height:30px;display:grid;place-items:center;color:var(--muted);opacity:.55}
+.recent-remove .icon{width:15px;height:15px}
+.recent-row:hover .recent-remove,.recent-remove:focus-visible{opacity:1}
+.recent-remove:hover{color:#d93025;background:var(--hover)}
+
+/* 저장소 관리: tabs over a fixed-height body of cards (only while the tabs are there, so a dialog
+   opened from it keeps its own size). */
+dialog.vault-manager:has(.vm-tabs){width:min(760px,94vw);max-width:none}
+dialog.vault-manager:has(.vm-tabs) .dialog-inner{display:flex;flex-direction:column;height:min(680px,88vh);padding-bottom:16px}
+.vm-tabs{display:flex;gap:2px;margin:4px 0 0;box-shadow:inset 0 -1px var(--line);flex:none;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.vm-tabs button{position:relative;display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.vm-tabs button:hover{color:var(--ink)}
+.vm-tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.vm-tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:6px}
+.vm-count{min-width:18px;padding:0 5px;border-radius:9px;background:var(--hover);color:var(--ink);font-size:11px;line-height:18px;text-align:center}
+.vm-dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.vm-body{flex:1;min-height:0;overflow-y:auto;padding:16px 2px 4px}
+.vm-panel{display:flex;flex-direction:column;gap:12px}
+.vm-panel[hidden]{display:none}
+.vm-card{margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.vm-card h3{margin:0 0 4px;font-size:14px}
+.vm-card>p.small{margin:0 0 10px;line-height:1.55}
+.vm-card textarea{width:100%;box-sizing:border-box;margin:2px 0 10px}
+.vm-card .row{margin-top:0}
+.vm-card .manager-list{margin:0;border-top:1px solid var(--line)}
+.vm-card .manager-list:empty,.vm-card .manager-list>p{color:var(--muted);font-size:12px;padding:10px 0 2px;margin:0}
+.vm-card .manager-row{padding:8px 0;border-bottom:1px solid var(--line)}
+.vm-card .manager-row:last-child{border-bottom:0}
+.vm-card label.collection-choice{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.55}
+.vm-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.vm-buttons button{white-space:nowrap}
+/* 번역 창: the vault's requests shown read-only above this translation's own. */
+.rules-kept{margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--soft,var(--hover))}
+.rules-kept p{margin:6px 0 8px;font-size:12px;white-space:pre-wrap;color:var(--ink)}
+.paper-item:has(>.batch-check:checked){background:var(--pale)}
+.vault-file.multi-selected{background:var(--pale);color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.nb-memo-open,.nb-mention{border:0;background:none;padding:0;color:#b45309;font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.nb-memo-body{overflow:hidden;margin-top:2px}.nb-memo-body>:first-child{margin-top:0}
+.nb-mentions{position:absolute;left:2px;bottom:-1.6em;display:flex;gap:6px;font-size:11px;white-space:nowrap}
+.nb-mention-menu{position:fixed;z-index:50;display:flex;flex-direction:column;min-width:180px;max-width:320px;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 18px #0002;padding:4px}
+.nb-mention-menu button{border:0;background:none;text-align:left;padding:5px 8px;border-radius:4px;color:var(--text,inherit);cursor:pointer}.nb-mention-menu button:hover{background:var(--soft,#eef2ff)}
+/* 메모 넣기 beside its button: many memos scroll inside it; a long title ends in an ellipsis. */
+.pop-menu.nb-memo-menu{max-height:min(420px,calc(100vh - 120px));overflow-y:auto;max-width:300px}
+.pop-menu.nb-memo-menu>*{flex-shrink:0}.pop-menu.nb-memo-menu [data-nb-embed]{display:flex;flex-direction:column;align-items:stretch;gap:1px;overflow:hidden}
+/* Each memo: its title, and under it the first line its memo card shows, small and grey; both on one line. */
+.nb-memo-menu .nb-memo-title,.nb-memo-menu .nb-memo-line{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb-memo-menu .nb-memo-line{font-size:11px;color:var(--muted)}.nb-memo-menu .nb-memo-line>*{display:inline;margin:0}.nb-memo-menu .nb-memo-line .katex{font-size:1em}
+.pop-menu .pop-menu-note{margin:4px 12px 8px;white-space:normal}
+.annotation-pin.memo-pin{background:#d97706;cursor:grab;touch-action:none}.annotation-pin.memo-pin:hover{background:#b45309}
+.memo-pin-arming :is(.original-pages .page,.notebook-pane .nb-page){cursor:crosshair}
+/* A memo on a notebook page: a card like the memo tab's (title and one line; pressed, the memo's live
+   editor), light like the paper in either theme and sized with the page. */
+.nb-memo-card{--surface:#fff;--ink:#191f28;--muted:#6b7684;--line:#e5e8eb;--hover:#f2f4f6;--soft:#f9fafb;--pale:#e8f3ff;--accent:#1b64da;font-size:max(10.5px,calc(10 * 100cqw / var(--nb-w,595)));display:flex;flex-direction:column;border:1px solid var(--line);border-radius:.8em;background:var(--surface);color:var(--ink);padding:.45em .8em .55em;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.nb-memo-card:not(.open){height:auto!important}
+body:not(.ink-active) .nb-memo-card:not(.open){cursor:pointer}
+.nb-memo-card:not(.open):hover{background:var(--soft)}
+.nb-memo-card.open{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.nb-memo-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nb-memo-card .nb-memo-head{display:flex;flex-wrap:wrap;align-items:center;gap:.1em .4em;min-width:0;flex:none}
+.nb-memo-card .nb-memo-head strong{flex:1;min-width:0;font-size:1.05em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb-memo-card .nb-memo-head strong.untitled{color:var(--muted);font-weight:600}
+.nb-memo-card .memo-title{flex:1 1 6em;min-width:3em;height:auto;font-size:1.05em;padding:.1em 0;cursor:text}
+.nb-memo-card .memo-actions{flex:none;gap:.1em}
+.nb-memo-card .memo-actions .row-more{font-size:1em;width:2em;height:2em;border-radius:.4em}
+.nb-memo-card .memo-actions .icon svg,.nb-memo-card .memo-source svg{width:1.15em;height:1.15em}
+.nb-memo-card .memo-source{height:1.8em;padding:0 .35em}
+.nb-memo-card .memo-glance{gap:.6em;margin-top:.2em}
+.nb-memo-card .memo-line{font-size:.95em}
+.nb-memo-card .memo-thumb{width:2.8em;height:2.1em}
+.nb-memo-card.open .note-box{flex:1;min-height:0;margin-top:.4em}
+.nb-memo-card.open .note-box .field-live{height:100%!important;min-height:0}
+.nb-memo-card .note-box .field-live .cm-editor{font-size:1em}
+.nb-memo-card .note-box .field-live .cm-scroller{padding:.5em .7em}
+.nb-memo-card .note-grip{display:none}
+.nb-memo-card .nb-memo-read{flex:1;min-height:0;overflow:auto;margin-top:.4em;font-size:.95em}
+.nb-memo-card .nb-remove{z-index:4;top:-.7em;right:-.7em;border-radius:50%;padding:.15em .45em;box-shadow:0 1px 3px #0003}
+/* A memo pin on a notebook page, as on the source pages. */
+.nb-pin{z-index:5}
+/* The selection's actions (a selection or a right-click): one row, side by side. */
+.ink-text-menu.ink-select-bar{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;padding:3px;gap:2px;border-radius:10px}
+.ink-select-bar button{width:auto;flex:none;padding:5px 8px;gap:5px;white-space:nowrap}
+.ink-select-bar button kbd{margin-left:2px}
+.ink-select-bar [data-ink-text="explain"]{color:var(--accent)}
+
+/* The notebook in its own window: the notebook pane fills it, with the ink tools above. */
+body.notebook-window .notebook-window-main{display:flex;flex-direction:column;height:100vh;min-height:0}
+body.notebook-window .notebook-window-main .reader-mode-toolbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+body.notebook-window .notebook-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* The resize corner shows only on a box under the pointer, a box being edited or the box pressed last. */
+.nb-resize{opacity:0;transition:opacity .12s}
+.nb-item:hover .nb-resize,.nb-item:focus-within .nb-resize,.nb-item.nb-focused .nb-resize,.nb-text.editing .nb-resize{opacity:1}
+.nb-item.nb-focused{outline:1px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px}
+/* Notebook header: 새 노트북, 저장 (menu) and 새 창 as icons. */
+.notebook-pane header .nb-icon{display:inline-flex;align-items:center;gap:1px;height:26px;min-width:26px;padding:0 4px;justify-content:center}
+.notebook-pane header .nb-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.notebook-pane header .nb-caret{display:inline-grid;place-items:center;margin-left:1px;color:var(--muted)}
+.notebook-pane header .nb-icon .nb-caret svg{width:13px;height:13px;stroke-width:2.4}
+.notebook-pane header .nb-status{flex:1;min-width:0;text-align:right}
+
+/* AI 태그 추천 (desktop/tags.js) */
+.tag-editor-tools{display:flex;gap:6px}
+.tag-ai-list{display:grid;gap:8px;margin:10px 0 4px}
+.tag-ai-item{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);align-items:center;gap:8px;cursor:pointer}
+.tag-ai-item small{grid-column:2/-1;line-height:1.5}
+
+/* 이미 있는 자료 · 삭제 (desktop/renderer.js) */
+.known-copies .manager-row span:first-child{display:grid;gap:2px;min-width:0}
+.known-copies .manager-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.danger:not(.primary){color:#c92a2a}
+button.primary.danger{background:#c92a2a;border-color:#c92a2a}
+button.primary.danger:hover{background:#a51111}
+
+/* 저장소 바꾸기 메뉴 (renderer.js vaultSwitchMenu) */
+/* The vault switcher's mark is the tree's own caret, pointing down; it turns up while the menu is open. */
+.storage .storage-caret{margin-left:auto;margin-right:4px;color:var(--muted);transform:rotate(90deg)}
+.storage[aria-expanded="true"] .storage-caret{transform:rotate(-90deg)}
+.pop-menu.vault-menu{min-width:240px;max-width:340px}
+.pop-menu .pop-menu-title{margin:6px 12px 4px;font-size:11px;color:var(--muted)}
+.pop-menu .pop-menu-empty{margin:4px 12px 8px}
+.pop-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}
+.pop-menu .vault-choice,.pop-menu.vault-menu [data-action="storage"]{display:flex;align-items:center;gap:8px}
+.pop-menu .vault-choice-name{display:grid;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pop-menu .vault-choice-name small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.pop-menu .vault-choice.current{font-weight:600;cursor:default}
+.pop-menu .vault-choice-mark{margin-left:auto;font-size:11px;font-weight:400;color:var(--primary)}
+
+/* 원문·번역 새 창 (index.html?viewWindow=original|translation): that pane alone, read-only. */
+body.view-window .sidebar,body.view-window #notes-panel,body.view-window .sidebar-edge,body.view-window .sidebar-opener,body.view-window .panel-resize,body.view-window .reader-mode-toolbar,body.view-window .pane-window,body.view-window .reader-status,body.view-window .reader-view-modes,body.view-window .topbar,body.view-window [data-action="gpt-retranslate"],body.view-window [data-action="gpt-export"],body.view-window [data-retranslate-page],body.view-window .translation-quality,body.view-window .layout-reading-notice{display:none!important}
+body.view-window .shell{display:grid!important;height:100vh!important;grid-template-columns:minmax(0,1fr)!important}
+body.view-window .main{height:100vh;overflow:hidden}
+body.view-window .reader-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;overflow:hidden;flex:1;min-height:0}
+
+/* The view switch (원문 · 번역 · 동시보기 · 노트북) sits over the middle of the pages, not of the whole
+   bar: with the right panel open the pages end where the panel begins, so the switch moves left by
+   half the panel's width. With the panel closed the two middles are the same. */
+@media(min-width:951px){.shell:not(.right-collapsed) .topbar-center{transform:translateX(calc(var(--panel-width,300px)/-2))}}
+/* ← 라이브러리 stands at the top bar's left end (after the button that reopens the sidebar, when
+   that is closed); the tool row below begins at the row's left edge. In a narrow window only the
+   arrow stays. */
+/* In the size and grey the label there had, the arrow to match; darker under the pointer. */
+.topbar-leading>.topbar-back{gap:5px;white-space:nowrap;flex:none;font-size:11px;color:var(--muted)}
+.topbar-leading>.topbar-back:hover,.topbar-leading>.topbar-back:focus-visible{color:var(--ink)}
+.topbar-back .icon,.topbar-back .icon svg{width:13px;height:13px}
+@media(max-width:1200px){.topbar-back .back-label{display:none}}
+
+/* Sending to another vault (desktop/transfer.js). */
+.transfer-form{display:flex;flex-direction:column;gap:12px;min-width:min(440px,80vw);max-width:560px}
+.transfer-form .transfer-field{display:flex;flex-direction:column;gap:6px}
+.transfer-form .transfer-field span{font-size:12px;color:var(--muted)}
+.transfer-form select{width:100%}
+.transfer-modes{display:flex;flex-wrap:wrap;gap:8px 18px}
+.transfer-check{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+#transfer-summary{white-space:pre-line}
+.transfer-modes label{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+#transfer-notes{margin:0;padding-left:18px;color:var(--muted)}
+#transfer-notes:empty{display:none}
+#transfer-summary{margin:0;overflow-wrap:anywhere}
+#toast .toast-action{margin-left:10px;padding:2px 10px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+#toast.show .toast-action{pointer-events:auto}
+
+/* Where a search found something in a paper (library.js contentHitsHtml), under its row; a place found, outlined a moment. */
+.content-hits{display:flex;flex-direction:column;gap:2px;margin:0 0 2px;min-width:0}
+.paper-item>.content-hits,.paper-item:has(>.batch-check)>.content-hits{grid-column:2/-2;grid-row:2}.paper-item:has(>.content-hits)>.fulltext-hit{grid-row:3}
+.content-hit{display:block;width:100%;min-width:0;text-align:left;border:0;background:var(--soft,#f9fafb);border-radius:6px;padding:4px 8px;font-size:12px;line-height:1.5;color:var(--ink);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.content-hit:hover,.content-hit:focus-visible{background:var(--pale)}
+.content-hit-kind{color:var(--accent);font-weight:600}.content-hit-text mark{background:#fff1a8;color:inherit;border-radius:2px}
+body.dark .content-hit-text mark{background:#6b5a12}
+.content-hits-more{align-self:flex-start;border:0;background:none;color:var(--accent);font-size:12px;padding:2px 8px;cursor:pointer}
+.search-flash{outline:3px solid #f59e0b!important;outline-offset:2px;border-radius:4px;transition:outline-color .3s}
+.ink-search-flash{position:absolute;pointer-events:none;z-index:6}
+
+/* A pane's tool row that has given some of its tools to the panel under its ⋯ (renderer.js toolRowLayout). The row no
+   longer scrolls or clips: what does not fit is in the panel, drawn as a list with each tool's name. The panel stays
+   inside its pane (a pane clips what leaves it, and the split handle and the side panels lie over it). */
+.tool-row{position:relative;overflow:visible}
+.tool-row>.tool-more{flex:none;width:30px;height:30px;padding:0;justify-content:center;margin-left:auto}
+.tool-row>.tool-more[aria-expanded="true"]{background:var(--hover);color:var(--ink)}
+.tool-row>.tool-more[hidden],.tool-overflow[hidden]{display:none}
+.tool-overflow{position:absolute;top:calc(100% + 4px);right:8px;z-index:15;display:flex;flex-direction:column;align-items:stretch;gap:2px;box-sizing:border-box;min-width:min(180px,calc(100% - 16px));max-width:calc(100% - 16px);overflow-x:auto;scrollbar-width:thin;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16);white-space:nowrap}
+.tool-overflow>*{flex:none;margin:0}
+.tool-overflow .pdf-tool,.nb-tools .tool-overflow .pdf-tool.nb-tool{width:auto;height:auto;min-height:30px;padding:4px 8px;gap:8px;justify-content:flex-start;border-radius:6px;color:var(--ink);font-size:12px}
+.tool-overflow .pdf-tool:hover:not(:disabled){background:var(--hover)}
+.tool-overflow .pdf-tool-label{display:inline}
+.tool-overflow .tool-overflow-label,.tool-overflow .pdf-tool-label{white-space:normal;text-align:left;line-height:1.25}
+.tool-overflow .nb-tools-sep,.tool-overflow .pdf-find-status:empty{display:none}
+.tool-overflow>:is(.pdf-page-nav,.nb-page-nav){display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0;padding:2px 8px;border:0}
+.tool-row>.tool-more svg{stroke-width:2.6}
+.tool-overflow>input{box-sizing:border-box;width:auto;margin:2px 8px}
+/* The notebook pane's header is such a row too: its buttons (새 노트북, 저장, the notebook's menu, the new window) go
+   under ⋯ before the notebook's name is squeezed away; the header no longer wraps onto a second line. */
+.notebook-pane>header.tool-row{flex-wrap:nowrap;overflow:visible}
+.notebook-pane>header.tool-row .nb-select{flex:0 1 auto;min-width:96px}
+.notebook-pane>header.tool-row .nb-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-pane-header.tool-row>.tool-more{width:26px;height:26px}
+.notebook-pane header .tool-overflow .nb-icon,.pdf-pane-header .tool-overflow .pane-window{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:auto;min-width:0;height:auto;min-height:30px;margin:0;padding:4px 8px;border-radius:6px;color:var(--ink);font-size:12px;white-space:normal;text-align:left}
+.pdf-pane-header .tool-overflow .pane-window:hover{background:var(--hover)}
