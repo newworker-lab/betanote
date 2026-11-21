@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { adoptVaultFolder, isVaultDirName, VAULT_DIR, OLD_VAULT_DIRS } = require('./legacy.cjs');
 const { constants } = require('node:fs');
 const appName = require('../core/app-name.cjs');
+const { vaultDirectory } = require('./vault-folder.cjs');
 const MAX_BYTES = 100 * 1024 * 1024;
 const validTag = tag => typeof tag === 'string' && Boolean(tag.trim()) && tag.length <= 60 && tag !== '__proto__';
 function cleanTag(name) { const tag = typeof name === 'string' ? name.trim().normalize('NFC') : ''; if (!validTag(tag)) throw Error(tr('태그 이름은 1–60자로 입력하세요.')); return tag; }
@@ -407,9 +408,17 @@ class Library {
   }
   async diskHash(){try{return crypto.createHash('sha256').update(await fs.readFile(this.file)).digest('hex');}catch(error){if(error.code==='ENOENT')return null;throw error;}}
   async assertUnchanged(){if(await this.diskHash()!==this.diskDigest)throw Object.assign(Error(tr('저장소가 다른 프로그램에서 변경됐습니다. ‘다시 읽기’를 누르면 재시작 없이 이어서 쓸 수 있습니다.')),{code:'APP_EXTERNAL_CHANGE'});}
+  // The vault's folder itself is not there any more: renamed, moved, or on a drive taken out. (Its records are then
+  // not "changed by another program": there is nothing to read again where it was.)
+  // A folder that is there under that name but without the records this app read or wrote (made again by a sync tool or
+  // by hand) is not the vault either.
+  async gone(){
+    try{if(!(await fs.stat(this.root)).isDirectory())return true;}catch(error){if(error.code==='ENOENT'||error.code==='ENOTDIR')return true;throw error;}
+    return this.diskDigest!==null&&await this.diskHash()===null;
+  }
   // Whether library.json on disk is still what this app last read or wrote.
   async unchanged(){return await this.diskHash()===this.diskDigest;}
-  async backupDirectory(){const directory=path.join(this.root,VAULT_DIR,'backups');await fs.mkdir(directory,{recursive:true});if(await fs.realpath(directory)!==directory)throw Error(tr('백업 폴더의 심볼릭 링크는 지원하지 않습니다.'));return directory;}
+  async backupDirectory(){const directory=path.join(this.root,VAULT_DIR,'backups');await vaultDirectory(this.root,directory);if(await fs.realpath(directory)!==directory)throw Error(tr('백업 폴더의 심볼릭 링크는 지원하지 않습니다.'));return directory;}
   async backup(label=tr('자동 백업')){
     await this.assertUnchanged();if(this.diskDigest===null)return null;
     const directory=await this.backupDirectory(),id=`${Date.now()}-${crypto.randomUUID()}.json`;
@@ -841,7 +850,7 @@ class Library {
     const match=typeof dataUrl==='string'&&dataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);if(!match)throw Error(tr('메모 그림은 PNG여야 합니다.'));
     const bytes=Buffer.from(match[1],'base64');if(bytes.length<8||bytes.length>8*1024*1024||bytes.readUInt32BE(0)!==0x89504e47)throw Error(tr('메모 그림을 확인하세요(8MB 이하 PNG).'));
     const name=crypto.createHash('sha256').update(bytes).digest('hex').slice(0,32)+'.png',directory=path.join(this.root,VAULT_DIR,'note-images');
-    await fs.mkdir(directory,{recursive:true});if(await fs.realpath(directory)!==directory)throw Error(tr('메모 그림 폴더의 심볼릭 링크는 지원하지 않습니다.'));
+    await vaultDirectory(this.root,directory);if(await fs.realpath(directory)!==directory)throw Error(tr('메모 그림 폴더의 심볼릭 링크는 지원하지 않습니다.'));
     const file=path.join(directory,name);try{await fs.writeFile(file,bytes,{flag:'wx'});}catch(error){if(error.code!=='EEXIST')throw error;}
     return name;
   }

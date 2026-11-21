@@ -9,10 +9,12 @@ function creatorLinesOf(paper){return creatorList(paper).map(c=>c.literal??(c.gi
 function parseCreatorText(text){return String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map(line=>{const at=line.indexOf(',');return at>0&&line.slice(0,at).trim()&&line.slice(at+1).trim()?{family:line.slice(0,at).trim(),given:line.slice(at+1).trim()}:{literal:line};});}
 const creatorDisplay=c=>c.literal??[c.given,c.family].filter(Boolean).join(' ');
 
+// The item's main PDF is a file in the vault (not missing): its name can be changed.
+const bibHasFile=paper=>{const a=paper.attachments?.find(x=>x.id===paper.primaryAttachmentId)||paper.attachments?.find(x=>x.role!=='translated');return !!a?.file;};
 bibliography=function(paper){
   const type=paper.type||'article-journal',creators=creatorList(paper);
   const rows=[[tr('자료 유형'),bibTypes[type]],[tr('제목'),paper.title],[tr('저자'),creators.map(creatorDisplay).join('; ')],[tr('날짜'),paper.date||paper.year],[containerLabel(type),paper.journal],[tr('권·호'),[paper.volume,paper.issue&&`(${paper.issue})`].filter(Boolean).join(' ')],[tr('쪽'),paper.pages],[tr('출판사·기관'),paper.publisher],['DOI',paper.doi],['URL',paper.url],['ISBN',paper.isbn],[tr('인용 키'),paper.citekey||appName.citekeyPrefix+paper.id]];
-  return `<div class="bib-head"><h3>${tr('서지정보')}</h3><div class="row"><button class="secondary small" data-action="autofill-paper" title="${tr('PDF의 DOI·제목으로 빈 칸을 채웁니다')}">${tr('자동 채우기')}</button><button class="secondary small" data-action="cite-paper">${tr('인용 복사')}</button><button class="secondary small" data-action="edit-bibliography">${tr('편집')}</button></div></div><dl class="bibliography">${rows.filter(([,v])=>v&&String(v).trim()).map(([label,value])=>`<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('')||`<dt>${tr('제목')}</dt><dd>—</dd>`}</dl>${creators.some(c=>c.literal!==undefined)&&creators.length?`<p class="small muted">${tr('구조화되지 않은 저자 이름은 원래 문자열 그대로 인용합니다. 편집에서 “성, 이름”으로 나눌 수 있습니다.')}</p>`:''}`;
+  return `<div class="bib-head"><h3>${tr('서지정보')}</h3><div class="row"><button class="secondary small" data-action="autofill-paper" title="${tr('PDF의 DOI·제목으로 빈 칸을 채웁니다')}">${tr('자동 채우기')}</button><button class="secondary small" data-action="cite-paper">${tr('인용 복사')}</button><button class="secondary small" data-action="edit-bibliography">${tr('편집')}</button>${bibHasFile(paper)?`<button class="secondary small" data-action="rename-file-title" title="${tr('이 자료의 PDF 파일 이름을 제목.pdf로 바꿉니다. 메모·번역·필기 연결은 그대로입니다.')}">${tr('제목으로 파일 이름')}</button>`:''}</div></div><dl class="bibliography">${rows.filter(([,v])=>v&&String(v).trim()).map(([label,value])=>`<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('')||`<dt>${tr('제목')}</dt><dd>—</dd>`}</dl>${creators.some(c=>c.literal!==undefined)&&creators.length?`<p class="small muted">${tr('구조화되지 않은 저자 이름은 원래 문자열 그대로 인용합니다. 편집에서 “성, 이름”으로 나눌 수 있습니다.')}</p>`:''}`;
 };
 editBibliography=function(){
   const p=selected(),type=p.type||'article-journal',field=(key,label,attrs='')=>`<div class="field"><label for="bib-${key}">${label}</label><input id="bib-${key}" name="${key}" value="${esc(p[key]||'')}" maxlength="${key==='url'?2000:1000}" ${attrs}></div>`;
@@ -596,13 +598,15 @@ document.addEventListener('click',event=>{
 });
 
 // ---- File names from the bibliography (Surname_Year_Title.pdf) ----
-async function renameFiles(paperIds){
+// With style 'title' (서지정보's 제목으로 파일 이름) the name is the title alone, and what is told is about the one file.
+async function renameFiles(paperIds,style){
   const id=state.storageKey;if(!paperIds.length)return;await desktopNotes();await globalThis.appFlushAll?.();
-  const result=await window.appApi.renameAttachments(id,paperIds);if(state.storageKey!==id)return;
+  const result=await window.appApi.renameAttachments(id,paperIds,style);if(state.storageKey!==id)return;
   applyItemSnapshot(result.snapshot);
+  if(style==='title'){toast(result.renamed?tr('파일 이름을 제목으로 바꿨습니다.'):result.unchanged?tr('파일 이름이 이미 제목과 같습니다.'):tr('파일 이름을 바꾸지 못했습니다: {error}',{error:result.failed[0]?.error||''}));return;}
   toast(`${tr('파일 이름 정리: {n}개 변경',{n:result.renamed})}${result.unchanged?`, ${tr('{n}개는 이미 정리됨',{n:result.unchanged})}`:''}${result.failed.length?`, ${tr('{n}개 실패({error})',{n:result.failed.length,error:result.failed[0].error})}`:''}`);
 }
-Object.assign(actions,{'rename-files':runDesktop(()=>renameFiles([state.selected])),'batch-rename-files':runDesktop(()=>renameFiles([...batchSelection].filter(id=>papers.some(p=>p.id===id))))});
+Object.assign(actions,{'rename-files':runDesktop(()=>renameFiles([state.selected])),'rename-file-title':runDesktop(()=>renameFiles([state.selected],'title')),'batch-rename-files':runDesktop(()=>renameFiles([...batchSelection].filter(id=>papers.some(p=>p.id===id))))});
 const baseRenameBar=batchBar;
 batchBar=function(){return baseRenameBar().replace('<!--batch-file-->',`<button class="secondary small" data-action="batch-rename-files" title="${tr('저자_연도_제목.pdf로 이름을 바꿉니다')}">${tr('파일 이름 정리')}</button><!--batch-file-->`);};
 // The vault manager switches automatic bibliography on import (per vault, this device).

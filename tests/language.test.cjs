@@ -56,7 +56,7 @@ test('APP_UI_LANG sets the screen for this run only', () => {
 });
 test('the windows are handed the settings, what they resolve to and the lists to choose from', () => {
   const info = languageInfo({ ui: 'en', translation: null, ai: null }, ['ja-JP']);
-  assert.deepEqual(info, { ui: 'en', translation: null, ai: null, aiResolved: 'en', translationResolved: null, translationAsk: true, translationUnchosen: { code: null, ask: true }, os: ['ja-JP'],
+  assert.deepEqual(info, { ui: 'en', translation: null, ai: null, askUi: false, aiResolved: 'en', translationResolved: null, translationAsk: true, translationUnchosen: { code: null, ask: true }, os: ['ja-JP'],
     choices: { ui: [{ code: 'ko', name: '한국어' }, { code: 'en', name: 'English' }], ai: languagesFor('ai').map(({ code, name }) => ({ code, name })), translation: [{ code: 'ko', name: '한국어' }] } });
   assert.equal(languageInfo({ ui: 'ko', translation: null, ai: 'fr' }, []).translationResolved, 'ko');
   assert.equal(languageInfo({ ui: 'ko', translation: null, ai: 'fr' }, []).aiResolved, 'fr');
@@ -105,4 +105,16 @@ test('a language change is kept first, and a setting changed meanwhile stays bes
   let late = null; writes = 0; disk = {};
   await keepLanguage(language, { ...io, read: async () => ({}), write: async value => { writes++; if (writes === 2) throw Error('late'); }, late: error => { late = error.message; } });
   assert.deepEqual(memory.language, language); assert.equal(late, 'late');
+});
+test('a new install is asked for its display language once; an install in use, or a run with APP_UI_LANG, is not', () => {
+  const { languageAskAtStart, languageInfo } = require('../desktop/language.cjs');
+  assert.equal(languageAskAtStart({ existingInstall: false, stored: undefined, override: undefined }), true);
+  assert.equal(languageAskAtStart({ existingInstall: true, stored: undefined, override: undefined }), false, 'an install in use (1.0.0) is not asked');
+  assert.equal(languageAskAtStart({ existingInstall: true, stored: true, override: undefined }), true, 'asked again until answered');
+  assert.equal(languageAskAtStart({ existingInstall: true, stored: 'yes', override: undefined }), false, 'only true asks');
+  assert.equal(languageAskAtStart({ existingInstall: false, stored: undefined, override: 'ko' }), false, 'a forced language is not asked about');
+  assert.equal(languageAskAtStart({ existingInstall: false, stored: undefined, override: 'xx' }), true, 'an override that is no display language forces nothing');
+  assert.equal(languageInfo({ ui: 'en' }, ['ja-JP'], true).askUi, true);
+  assert.equal(languageInfo({ ui: 'en' }, ['ja-JP']).askUi, false);
+  assert.equal(languageInfo({}, ['ja-JP'], true).ui, 'ko', 'normalizeLanguage is unchanged');
 });

@@ -90,6 +90,11 @@ test('file names come from the first author, year and title, without invented pa
  assert.equal(fileNameFor({authors:'Kim, H.; Lee, J.',year:'—',date:'2019-03',title:'Deep/monitoring?'}),'Kim_2019_Deep monitoring.pdf');
  assert.equal(fileNameFor({creators:[{literal:'World Health Organization'}],year:'2020',title:'Report'}),'World_2020_Report.pdf');
  assert.equal(fileNameFor({authors:'저자 미입력',year:'—',title:''}),null);
+ // The title alone (서지정보's 제목으로 파일 이름): no author or year, unsafe characters out, long titles cut at a word.
+ assert.equal(fileNameFor({creators:[{family:'Doe'}],year:'2024',title:'Deep/monitoring: a "review"?'},'title'),'Deep monitoring a review.pdf');
+ assert.equal(fileNameFor({title:'  ..Hidden title.  '},'title'),'Hidden title.pdf');
+ const long=fileNameFor({title:'word '.repeat(60)},'title');assert.ok(long.length<=154&&long.endsWith('word.pdf'),long);
+ assert.equal(fileNameFor({creators:[{family:'Doe'}],year:'2024',title:''},'title'),null);
 });
 
 test('metadata without a printed DOI: DataCite records, near-identical title matches, and the PDF’s own information',()=>{

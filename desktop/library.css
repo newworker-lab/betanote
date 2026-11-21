@@ -584,9 +584,23 @@ body:not(.ink-active) .nb-text:not(.editing):hover textarea{outline-color:#cbd5e
 .welcome-hero h1{flex-basis:100%;margin:15px 0 22px}
 .welcome-hero>button{margin:0;height:48px}
 /* The screen language on the start screen: small, at the right of the logo row, so nothing below moves. */
-.welcome-language{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.welcome-language{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
+.welcome-language[hidden]{display:none}
 .welcome-language .icon{width:16px;height:16px}
-.welcome-language select{font-size:12px;padding:5px 8px;border-radius:7px}
+.welcome-language .segmented button{font-size:12px;padding:6px 13px;color:var(--muted)}
+.welcome-language .segmented .active{color:var(--accent)}
+/* The first start's question (renderer.js languageFirst): one card in the middle of the window, two languages side by side. */
+.welcome.language-first{display:grid;place-items:center;min-height:100vh;box-sizing:border-box;margin:0 auto}
+.language-first-card{box-sizing:border-box;width:min(460px,100%);padding:34px 36px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 12px 40px rgba(25,31,40,.10);text-align:center}
+.language-first-card h1{margin:22px 0 4px;font-size:20px;letter-spacing:-.4px}
+.language-first-second{margin:0 0 22px;color:var(--muted);font-size:15px}
+.language-first-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.language-first-pick button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
+.language-first-pick button strong{font-size:18px}.language-first-pick button small{font-size:12px;color:var(--muted)}
+.language-first-pick button.active{border-color:var(--accent);background:var(--pale);color:var(--accent)}
+.language-first-pick button:focus-visible,.language-first-card .primary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.language-first-card .primary{width:100%;justify-content:center;padding:12px;font-size:14px}
+.language-first-card .small{margin:14px 0 0;line-height:1.6}
 /* Library header: the actions read as one compact toolbar, below the title on a narrow window. */
 .library-title{flex-wrap:wrap;gap:12px}
 .library-title>.row{flex-wrap:wrap;gap:6px}
@@ -801,3 +815,4 @@ body.dark .content-hit-text mark{background:#6b5a12}
 .pdf-pane-header.tool-row>.tool-more{width:26px;height:26px}
 .notebook-pane header .tool-overflow .nb-icon,.pdf-pane-header .tool-overflow .pane-window{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:auto;min-width:0;height:auto;min-height:30px;margin:0;padding:4px 8px;border-radius:6px;color:var(--ink);font-size:12px;white-space:normal;text-align:left}
 .pdf-pane-header .tool-overflow .pane-window:hover{background:var(--hover)}
+.language-first-card .logo{justify-content:center}

@@ -17,6 +17,13 @@ function normalizeLanguage(value) {
 function initialLanguage({ existingInstall, osLanguages }) {
   return { ui: existingInstall || matchLanguage(osLanguages, 'ui') === 'ko' ? 'ko' : 'en', translation: null, ai: null };
 }
+// A new install is asked for its display language once, at its first start (the start screen's card). It is "asked"
+// until a display language is chosen there: settings.json carries languageAsk: true meanwhile. An install already in
+// use (a settings file without that key, as 1.0.0 left it) is not asked, nor is a run whose language APP_UI_LANG sets.
+function languageAskAtStart({ existingInstall, stored, override }) {
+  if (allowed(override, 'ui')) return false;
+  return !existingInstall || stored === true;
+}
 // APP_UI_LANG (ko or en) sets the screen for this run only, for tests and development.
 function startupLanguage(settings, override) {
   const value = normalizeLanguage(settings);
@@ -61,10 +68,10 @@ async function keepLanguage(stored, { get, set, write, read, late }) {
 const choices = kind => languagesFor(kind).map(({ code, name }) => ({ code, name }));
 // What a window receives (preload appApi.language): the settings, what they resolve to, the
 // system's languages and the lists to choose from (the page does not load core/languages.cjs).
-function languageInfo(settings, osLanguages) {
+function languageInfo(settings, osLanguages, askUi = false) {
   const value = normalizeLanguage(settings), os = Array.isArray(osLanguages) ? osLanguages.filter(tag => typeof tag === 'string') : [], translation = translationLanguage(value, os);
   // What the translation would be with no language chosen (the settings list's empty value), whatever is chosen now.
   const unchosen = translationLanguage({ ...value, translation: null }, os);
-  return { ...value, aiResolved: aiLanguage(value), translationResolved: translation.code, translationAsk: translation.ask, translationUnchosen: unchosen, os, choices: { ui: choices('ui'), ai: choices('ai'), translation: choices('translation') } };
+  return { ...value, askUi: askUi === true, aiResolved: aiLanguage(value), translationResolved: translation.code, translationAsk: translation.ask, translationUnchosen: unchosen, os, choices: { ui: choices('ui'), ai: choices('ai'), translation: choices('translation') } };
 }
-module.exports = { normalizeLanguage, initialLanguage, startupLanguage, patchLanguage, aiLanguage, translationLanguage, languageInfo, systemLanguagesFrom, keepLanguage };
+module.exports = { normalizeLanguage, initialLanguage, languageAskAtStart, startupLanguage, patchLanguage, aiLanguage, translationLanguage, languageInfo, systemLanguagesFrom, keepLanguage };

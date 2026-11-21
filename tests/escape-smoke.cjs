@@ -14,6 +14,7 @@ const root = path.resolve(__dirname, '..');
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), `${appName.id}-escape-e2e-`)), vault = path.join(temp, 'vault'); await fs.mkdir(vault);
   const doc = await PDFDocument.create(), font = await doc.embedFont(StandardFonts.Helvetica); doc.addPage([600, 800]).drawText('A research paper connects ideas.', { x: 40, y: 740, size: 14, font });
   await fs.writeFile(path.join(temp, 'paper.pdf'), await doc.save());
+  require('./app-executable.cjs'); // gives the run its language (APP_UI_LANG) before env is read: a new profile would be asked for one
   const env = /utf-?8/i.test(process.env.LC_ALL || process.env.LANG || '') ? process.env : { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' };
   let app;
   try {

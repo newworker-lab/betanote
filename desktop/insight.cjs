@@ -10,6 +10,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { atomicJson, KeyedQueue, readAiRecords, keepConflictCopy } = require('./storage.cjs');
 const { VAULT_DIR } = require('./legacy.cjs');
+const { vaultDirectory } = require('./vault-folder.cjs');
 
 const BUDGET = 120000; // characters of paper text per request
 // A connection with a shorter context (a local model) says how much it takes.
@@ -263,7 +264,7 @@ async function compare(auth, model, { papers, question, language = 'ko' }, signa
 class InsightStore extends KeyedQueue {
   // report (optional) takes what the first write after a conflicted file left out: counts and the file's vault name only.
   constructor(library, report) { super(); this.library = library; this.report = report; }
-  async file(attachmentId) { const dir = path.join(this.library.root, VAULT_DIR, 'ai'); await fs.mkdir(dir, { recursive: true }); return path.join(dir, attachmentId + '.json'); }
+  async file(attachmentId) { const dir = path.join(this.library.root, VAULT_DIR, 'ai'); await vaultDirectory(this.library.root, dir); return path.join(dir, attachmentId + '.json'); }
   async list(paperId, attachmentId) { const a = this.library.attachment(paperId, attachmentId); return (await readAiRecords(await this.file(a.id))).data.results; }
   // Written whole; a file git left conflict marks in is copied into the backups first (storage.cjs keepConflictCopy).
   async write(file, read, data, cut = 0) {

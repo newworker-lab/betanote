@@ -36,8 +36,29 @@ jobs:
         run: npm run test:desktop
       - name: Archive packages and checksums
         env:
-          APP_RELEASE_VERIFICATION: 'Linux packaged app tested (npm run test:desktop); Windows packaged, runtime not tested'
+          APP_RELEASE_VERIFICATION: 'Linux packaged app tested (npm run test:desktop); Debian package installed, reinstalled and removed on ubuntu-24.04; Windows packaged, runtime not tested'
         run: python3 scripts/archive.py
+      # The Debian package as a person meets it: installed with its dependencies, installed again over itself (the
+      # user's own settings stay), and removed without leaving its entry in the applications list.
+      - name: Install, reinstall and remove the Debian package
+        run: |
+          set -e
+          id="$(node -p "require('./core/app-name.json').id")"
+          deb="$(ls release/${id}_*_amd64.deb)"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desktop-file-utils "./$deb"
+          desktop-file-validate "/usr/share/applications/$id.desktop"
+          test -u "/opt/$id/chrome-sandbox"
+          test -x "/usr/bin/$id"
+          test -f "/usr/share/icons/hicolor/256x256/apps/$id.png"
+          mkdir -p "$HOME/.config/keep-me"
+          sudo apt-get install -y -qq --reinstall "./$deb"
+          test -d "$HOME/.config/keep-me"
+          sudo apt-get remove -y -qq "$id"
+          test ! -e "/usr/share/applications/$id.desktop"
+          test ! -e "/opt/$id/$id"
+          test ! -e "/usr/bin/$id"
+          test ! -e "/usr/share/icons/hicolor/256x256/apps/$id.png"
       - name: Create release and upload files
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,4 +76,4 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" --target "$GITHUB_SHA" --title "${name} ${version}" --notes-file release/RELEASE-NOTES.md
           fi
-          gh release upload "$tag" "release/${id}-${version}-windows-x64.zip" "release/${id}-${version}-linux-x64.tar.gz" release/SHA256SUMS.txt --clobber
+          gh release upload "$tag" "release/${id}-${version}-windows-x64.zip" "release/${id}-${version}-linux-x64.tar.gz" "release/${id}_${version}_amd64.deb" release/SHA256SUMS.txt --clobber

@@ -53,6 +53,8 @@ APP_TEST_SOURCE=1 npm run test:desktop   # 설치 파일 없이 소스로 데스
 npm run test:ocr                           # 그림 슬라이드의 로컬 OCR(실제 tesseract.js), 조각난 글자층 스캔본의 줄 잇기
 npm run test:view-window                   # 원문·번역 새 창: 앱의 읽기 화면으로 열림, 보기 전용
 npm run test:diagnostics                   # 진단 기록: 오류 기록, 진단 정보 복사, 죽은 화면 복구
+npm run test:update                        # 새 버전 알림: 알림, 건너뛰기, 끄기, 실패한 확인
+npm run test:vault-moved                   # 열어 둔 저장소 폴더의 이름을 바꾸거나 옮겼을 때: 찾을 수 없다고 알리고 다시 고르기
 npm run test:tool-row                      # 좁은 창의 도구 줄: 넘치는 도구는 ⋯ 아래로, 넓어지면 제자리로
 npm run test:ink                           # 기능별 스모크(test:library, test:ai, test:local, test:api,
                                            #   test:auto-tag, test:duplicates, test:bibliography, test:vault-watch, test:notebook, test:memo, test:search, test:help, test:sync, test:multi-select, test:pdf-layout, test:textbox, test:escape, test:transfer, test:key-scroll 등)
@@ -1051,6 +1053,43 @@ PDF 쪽의 텍스트 상자와 노트북 텍스트 상자는 같은 서식 막�
 
 노트북의 상자(텍스트·그림·출처·메모 카드)는 읽기 도구로 끌어 옮기고, 오른쪽 아래 모서리로 크기를 바꾼다. 모서리는 상자에 마우스를 올리거나 상자를 눌러 선택했을 때만 보인다. 모서리와 ×는 펜·형광펜을 고른 동안과 텍스트를 쓰는 중에도 동작한다. 마지막에 누른 상자는 테두리로 표시되고 Delete(또는 Backspace)로 지운다.
 
+## Linux 설치 패키지 (.deb)
+
+`scripts/archive.py`는 Linux 폴더를 `tar.gz`로 묶은 뒤 같은 폴더로 Debian 꾸러미(`<id>_<버전>_amd64.deb`)도 만든다(`build_deb`, `dpkg-deb`가 있을 때만. 없으면 건너뛰고 `tar.gz`만 남는다).
+
+- 꾸러미 안: 앱은 `/opt/<id>/`, 실행 링크는 `/usr/bin/<id>`, 앱 목록 항목은 `/usr/share/applications/<id>.desktop`(PDF 연결 프로그램으로는 등록하지 않는다: 앱이 시작할 때 받은 파일을 열지 않는다), 아이콘은 `/usr/share/icons/hicolor/<N>x<N>/apps/<id>.png`(`brand/png`의 8개 크기), 라이선스는 `/usr/share/doc/<id>/copyright`.
+- 설치 뒤(`postinst`) `chrome-sandbox`를 set-uid로 바꾸고 앱 목록·아이콘 캐시를 갱신한다. 제거 뒤(`postrm`)에도 갱신한다. 사용자 설정(`~/.config`)과 저장소 폴더는 건드리지 않는다.
+- 의존성은 Ubuntu 24.04에서 이름이 바뀐 라이브러리를 두 이름으로 적는다(`libasound2 | libasound2t64` 등). 22.04와 24.04에서 같은 꾸러미를 쓴다.
+- 릴리스 워크플로는 올리기 전에 `ubuntu-24.04`에서 설치 → 덮어 설치 → 제거를 하고, 앱 목록 항목이 올바른지(`desktop-file-validate`)와 제거 뒤 남지 않는지를 본다.
+- 이름·버전·설명·관리자 표기는 이름 파일과 `package.json`에서 온다(`--dry-run`의 `deb`·`control`·`desktop`, `tests/app-name.test.cjs`).
+
+## Microsoft Store 패키지
+
+Windows의 서명 경고 없이 배포하는 길로 Microsoft Store에 올릴 MSIX 패키지를 만든다. 스토어가 올린 패키지를 서명하므로 여기서는 서명하지 않는다.
+
+- `scripts/msix.mjs`: 패키징된 Windows 앱 폴더(`release/betanote-win32-x64`, `npm run package:win`)에 `AppxManifest.xml`을 쓰고 스토어 로고(`brand/msix`)를 `Assets/`로 복사한다. 버전은 `package.json`의 세 자리에 `.0`을 붙인다(스토어가 넷째 자리를 쓴다).
+- `.github/workflows/msix.yml`(`Build Microsoft Store package`): Windows 러너에서 앱을 패키징하고 `MakePri`로 `resources.pri`를, `MakeAppx`로 `.msix`를 만들어 실행의 아티팩트(`msix`)로 남긴다. 릴리스에는 붙이지 않는다. 손으로 시작하거나, 패키지 관련 파일이 바뀐 `main` 푸시로 시작한다.
+- 패키지의 신원은 이름 파일(`core/app-name.json`)의 `store`에 둔다. Partner Center에서 예약한 앱의 제품 ID 페이지에 나오는 값이고 비밀이 아니다(모든 패키지에 들어간다): `name`(Package/Identity/Name), `publisher`(`CN=…`), `publisherDisplayName`, `displayName`(예약한 이름). 저장소 변수 `MSIX_IDENTITY_NAME`·`MSIX_PUBLISHER`·`MSIX_PUBLISHER_DISPLAY_NAME`·`MSIX_DISPLAY_NAME`가 있으면 그 값이 대신 쓰인다.
+- 앱은 전체 신뢰(`runFullTrust`) 데스크톱 앱으로 들어간다. 패키지로 설치된 앱에서의 동작(설정 폴더 위치, 보안 저장소, 저장소 폴더 접근, 새 창)은 실기기에서 확인해야 한다.
+
+## 열어 둔 저장소의 폴더가 사라졌을 때
+
+저장소를 열어 둔 채 탐색기에서 그 폴더의 이름을 바꾸거나 옮기거나, 드라이브가 빠지면 `library.json`이 있던 자리가 없어진다. 이것은 "다른 프로그램이 바꿨다"와 다르다(다시 읽을 것이 그 자리에 없다).
+
+- `Library.gone()`(`storage.cjs`)이 저장소 폴더 자체가 없는지를 본다. 주 프로세스는 저장이 거절됐을 때(`APP_EXTERNAL_CHANGE`)와 창이 다시 앞에 왔을 때의 확인(`vault-check`)에 그 여부(`gone`)를 함께 알린다.
+- 창은 `저장소 폴더를 찾을 수 없습니다`를 보이고 `폴더 다시 고르기`(`vault-relocate`)를 제안한다. 고른 폴더는 아무것도 만들기 전에 들여다보고, 같은 저장소(`library.json`의 `id`)일 때만 받는다. 받으면 여느 저장소처럼 연결하고(`connect`: 새 자리를 잠그고 열고 최근 목록에 올린다. 폴더와 함께 옮겨진 이 앱 자신의 잠금은 남은 것으로 보고 정리한다), 창이 아직 저장하지 못한 메모는 다시 읽기와 같은 방식으로 합친다(`mergePendingNotes`). 최근 목록에서 옛 자리는 뺀다.
+- 사라진 저장소를 닫을 때는 종료 백업을 쓰지 않는다(옛 이름의 빈 폴더가 다시 생기지 않게).
+
+## 새 버전 알림
+
+앱은 새 릴리스가 나왔는지 알리기만 하고 설치하지 않는다(`desktop/update-check.cjs`, `main.cjs`의 `checkForUpdate`, `help.js`의 `showUpdate`).
+
+- **무엇을 묻나**: `package.json`의 저장소(`repository.url`)에 대한 GitHub의 최신 릴리스 주소 하나(`releaseFeed`). 자료·사용 기록·기기 정보는 보내지 않는다. 답에서 태그(`v1.2.3`)와 릴리스 페이지 주소만 읽고, 초안·시험판·`https://github.com/`로 시작하지 않는 주소는 버린다.
+- **언제**: 주 창이 뜬 뒤 한 번, 하루에 한 번까지(`settings.json`의 `updateCheckedAt`). 답을 받지 못한 확인은 세지 않아 다음 실행에 다시 묻는다. 실패는 조용히 넘어간다.
+- **하지 않는 경우**: Microsoft Store 패키지(`process.windowsStore`: 스토어가 업데이트한다), 설정 → 일반의 `시작할 때 새 버전 확인`을 끈 경우(`features.updateCheck`), `APP_UPDATE_FEED=off`(스모크는 모두 이 값으로 돈다. 다른 값이면 그 주소를 읽는다: `tests/update-smoke.cjs`의 자체 서버).
+- **알림**: 실행 중인 판보다 높은 버전이고 건너뛴 버전(`updateSkipped`)이 아니면 한 번 알린다. 다른 대화상자나 첫 실행 언어 카드가 떠 있으면 기다린다. `내려받기`는 릴리스 페이지를 브라우저로 열고, `이 버전 건너뛰기`는 그 버전을 다시 알리지 않는다.
+- 확인 한 번으로 설치까지 하는 자동 업데이트는 서명된 설치 프로그램이 있어야 한다(지금은 없다).
+
 ## 좁은 창의 도구 줄
 
 원문·번역 창의 도구 줄(`.pdf-pane-tools`), 노트북의 도구 줄(`.nb-tools`), 노트북 창 머리줄(이름 옆의 `새 노트북`·`저장`·노트북 메뉴·새 창 버튼)은 창이 좁아도 잘리거나 옆으로 밀리지 않는다(`renderer.js`의 `toolRowLayout`).
@@ -1242,6 +1281,13 @@ Windows·Ubuntu 22.04에서 파일 변경 감지·UTF-8·경로 대소문자·�
 | `desktop/language.cjs` | 설정 값 정리, 기본값, 무엇으로 풀리는지(`aiLanguage`, `translationLanguage`, `languageInfo`), 운영체제 언어(`systemLanguagesFrom`) |
 | `desktop/appearance.js` | 설정 > 언어의 세 목록. 시작 화면의 화면 언어 목록은 `renderer.js` |
 
+### 처음 실행할 때 묻기, 시작 화면의 전환 버튼
+
+- 새 설치는 첫 실행의 시작 화면에서 화면 언어를 한 번 묻는다(`renderer.js`의 `languageFirst`). 질문은 두 언어로 함께 적고(`trIn`), 각 언어는 자기 이름으로 보인다. 운영체제 언어를 미리 골라 두고 초점은 `시작하기`에 있어 Enter 하나로 넘어간다. 고르기 전에는 저장소 연결 등 다른 것이 보이지 않는다.
+- "아직 묻지 않음"은 설정 파일의 `languageAsk: true`다(`language.cjs`의 `languageAskAtStart`). 설정 파일이 없던 새 설치의 첫 실행에 생기고, 화면 언어를 고르면(`set-language`에 `ui`. 지금 언어와 같아도) 같은 쓰기에서 지워진다. 고르지 않고 닫으면 다음 실행에 다시 묻는다. 이미 쓰던 설치(그 키가 없는 설정 파일)와 `APP_UI_LANG`으로 언어를 정한 실행(시험·개발)은 묻지 않는다. 창은 `appApi.language.askUi`로 안다.
+- 저장하지 못하면 이유를 알리고 그 실행은 시작 화면으로 넘어간다(다음 실행에 다시 묻는다).
+- 시작 화면 오른쪽 위에는 화면 언어마다 버튼이 하나씩 있다(`welcomeLanguage`, `[data-welcome-language]`). 누르면 설정의 화면 언어 목록과 같은 길(`appearance.js`의 `chooseLanguage`)로 바뀐다.
+
 ### 세 설정과 기본값
 
 `settings.json`의 `language: { ui, translation, ai }`에 둔다. `translation`·`ai`의 `null`은 "화면 언어와 같게"다.
@@ -1349,6 +1395,6 @@ AI 결과를 메모에 넣을 때의 머리말, 그림 설명 머리말, 주석 
 
 번역 창의 "이번 번역 요청 사항"은 메모 AI와 같은 입력 상자다. 첨부 그림이 위, 입력 칸이 가운데, 그림 첨부(+)가 아래에 있고, 붙여 넣기도 된다. AI 탭의 질문 칸도 보내기 아이콘이 든 같은 상자다.
 
-그림 설명 창의 질문도 같은 입력 상자(보내기 아이콘, Ctrl+Enter)이고, 칩은 상자 아래에 있다. 칩 목록은 칩이 든 영역이 스크롤될 때만 닫힌다. 질문을 비우고 보내면 그림을 설명한다. 답은 AI 기록과 같은 카드로 보이고, `주석에 추가`를 누르면 그림 상자와 함께 그림 설명 주석이 된다.
+그림 설명 창의 질문도 같은 입력 상자(보내기 아이콘, Enter로 보내고 Shift+Enter로 줄바꿈. 한글 조합을 끝내는 Enter는 보내지 않는다: `aiSendKey`)이고, 칩은 상자 아래에 있다. 칩 목록은 칩이 든 영역이 스크롤될 때만 닫힌다. 질문을 비우고 보내면 그림을 설명한다. 답은 AI 기록과 같은 카드로 보이고, `주석에 추가`를 누르면 그림 상자와 함께 그림 설명 주석이 된다.
 
 번역 요청 사항(저장소 요청과 이번 요청을 합친 `userRules`)과 참고 이미지는 요청마다 문맥으로 간다. `USER_RULES_NOTE`는 번역하지 않을 부분을 요청할 수 있다고 적는다. 그 부분은 원문을 그대로 돌려받는데, 참고 이미지가 표시한 부분도 마찬가지다. 요청이나 참고 이미지가 있으면 원문을 그대로 돌려준 답을 번역 실패로 거절하지 않는다(`checkReply`).

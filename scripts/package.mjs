@@ -18,7 +18,7 @@ const outputs = await packager({
   name: appName.id, executableName: appName.id, icon: fileURLToPath(new URL(`../brand/${appName.id}`, import.meta.url)), platform, arch: 'x64', out: 'release', overwrite: true,
   win32metadata: { ProductName: appName.name, FileDescription: appName.name },
   ignore: [
-    /^\/(release|tests|docs|scripts|brand|\.git|\.github|\.claude|\.vscode)(\/|$)/,
+    /^\/(release|tests|docs|scripts|brand|msix|\.git|\.github|\.claude|\.superpowers|\.vscode)(\/|$)/,
     /^\/[^/]+\.md$/,
     /^\/LICENSE$/, // the app's licence goes beside the executable (scripts/archive.py), not into app.asar
     /^\/\.(gitignore|gitattributes|editorconfig|npmrc|env[^/]*)$/,

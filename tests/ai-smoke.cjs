@@ -134,7 +134,12 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('.insight-card.open [data-insight-ai]').click(); await p.locator('#dialog.insight-wide-dialog .note-ai #editor-ai-instruction').waitFor();
     assert.equal(await p.locator('#dialog [data-memo-ai-mode="edit"]').count(), 0, 'a result is asked about, not rewritten');
     assert.match(await p.locator('#dialog .memo-ai-hint').textContent(), /이 결과 끝에 추가/);
-    await p.locator('#editor-ai-instruction').fill('평균인가요?'); await p.locator('[data-editor-ai-send]').click();
+    // The question box: Shift+Enter breaks the line, an Enter that ends a syllable's composition sends nothing, Enter sends.
+    const box = p.locator('#editor-ai-instruction'); await box.fill('평균인가요?'); await box.press('Shift+Enter');
+    assert.equal(await box.inputValue(), '평균인가요?\n', 'Shift+Enter breaks the line'); await box.press('Backspace');
+    await box.evaluate(node => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })));
+    assert.equal(await box.inputValue(), '평균인가요?', 'an Enter of the input method sends nothing'); assert.equal(await box.isEditable(), true);
+    await box.press('Enter');
     await p.locator('#dialog [data-editor-ai-take="append"]').filter({ hasText: '결과에 추가' }).click(); await p.locator('#toast').filter({ hasText: '결과 아래에 추가' }).waitFor();
     const follow = await app.evaluate(() => globalThis.requests.at(-1)); assert.equal(follow.question, '평균인가요?'); assert.match(follow.earlierResult, /Q\. reading speed[\s\S]*12% 빨라졌습니다/); assert.equal(follow.note, undefined);
     await p.locator('#dialog .insight-follow').filter({ hasText: '12%는 평균입니다' }).waitFor(); assert.match(await p.locator('#dialog .insight-follow').textContent(), /Q\. 평균인가요\?/);

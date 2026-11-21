@@ -1,7 +1,7 @@
 {
   "name": "betanote",
   "productName": "BetaNote",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "repository": {
@@ -17,7 +17,7 @@
     "notices": "node scripts/third-party-notices.mjs",
     "package": "npm run build && node scripts/package.mjs linux",
     "package:win": "npm run build && node scripts/package.mjs win32",
-    "test": "node --test tests/empty-catch.test.cjs tests/content-index.test.cjs tests/ai-rules.test.cjs tests/notebook-board.test.cjs tests/prototype-gone.test.cjs tests/file-error.test.cjs tests/release-docs.test.cjs tests/vault-lock.test.cjs tests/settings-file.test.cjs tests/error-codes.test.cjs tests/i18n.test.cjs tests/language.test.cjs tests/i18n-lint.test.cjs tests/storage.test.cjs tests/chatgpt.test.cjs tests/llm.test.cjs tests/local-llm.test.cjs tests/api-llm.test.cjs tests/translation.test.cjs tests/bibliography.test.cjs tests/ink.test.cjs tests/fulltext.test.cjs tests/backup.test.cjs tests/diagnostics.test.cjs tests/vault-watch.test.cjs tests/core-boundary.test.cjs tests/insight.test.cjs tests/corrections.test.cjs tests/notebook.test.cjs tests/sync.test.cjs tests/features.test.cjs tests/markdown.test.cjs tests/themes.test.cjs tests/live-scan.test.cjs tests/print-text.test.cjs tests/memo-labels.test.cjs tests/ai-language.test.cjs tests/conflict-records.test.cjs tests/storage-keys.test.cjs tests/names.test.cjs tests/app-name.test.cjs tests/transfer.test.cjs",
+    "test": "node --test tests/update-check.test.cjs tests/empty-catch.test.cjs tests/content-index.test.cjs tests/ai-rules.test.cjs tests/notebook-board.test.cjs tests/prototype-gone.test.cjs tests/file-error.test.cjs tests/release-docs.test.cjs tests/vault-lock.test.cjs tests/settings-file.test.cjs tests/error-codes.test.cjs tests/i18n.test.cjs tests/language.test.cjs tests/i18n-lint.test.cjs tests/storage.test.cjs tests/chatgpt.test.cjs tests/llm.test.cjs tests/local-llm.test.cjs tests/api-llm.test.cjs tests/translation.test.cjs tests/bibliography.test.cjs tests/ink.test.cjs tests/fulltext.test.cjs tests/backup.test.cjs tests/diagnostics.test.cjs tests/vault-watch.test.cjs tests/core-boundary.test.cjs tests/insight.test.cjs tests/corrections.test.cjs tests/notebook.test.cjs tests/sync.test.cjs tests/features.test.cjs tests/markdown.test.cjs tests/themes.test.cjs tests/live-scan.test.cjs tests/print-text.test.cjs tests/memo-labels.test.cjs tests/ai-language.test.cjs tests/conflict-records.test.cjs tests/storage-keys.test.cjs tests/names.test.cjs tests/app-name.test.cjs tests/transfer.test.cjs",
     "test:desktop": "node tests/desktop-smoke.cjs",
     "pretest:transfer": "npm run build",
     "test:transfer": "node tests/transfer-smoke.cjs && node tests/transfer-guard-smoke.cjs && node tests/transfer-folder-smoke.cjs",
@@ -72,6 +72,10 @@
     "test:sync": "node tests/sync-smoke.cjs",
     "test:takeover": "node tests/takeover-smoke.cjs",
     "test:highlight": "node tests/highlight-smoke.cjs",
+    "pretest:update": "npm run build",
+    "test:update": "node tests/update-smoke.cjs",
+    "pretest:vault-moved": "npm run build",
+    "test:vault-moved": "node tests/vault-moved-smoke.cjs",
     "pretest:tool-row": "npm run build",
     "test:tool-row": "node tests/tool-row-smoke.cjs",
     "pretest:ink-perf": "npm run build",

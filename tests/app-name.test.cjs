@@ -135,12 +135,17 @@ test('the release script names the packages and writes the notes from the name f
   assert.deepEqual(out.executables, { windows: 'zetanote.exe', linux: 'zetanote' }); assert.equal(out.licence, 'LICENSE-ZETANOTE.txt');
   assert.match(out.notes, new RegExp(`^ζnote ${version} · source \``));
   // The section about the name change is the text file's, filled from the name file; without the file there is none.
+  // (The repository holds that file only until the first release under a new name is out; the copy gets one here.)
+  fs.mkdirSync(path.join(dir, 'docs', 'release'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'docs', 'release', 'name-change.md'), '<!-- filled from the name file -->\n\n## 이름이 {name}로 바뀌었습니다\n\n- 이전 이름({previous})으로 만든 저장소는 그대로 넘겨받습니다.\n- 자료의 **기본 인용 키가 `{citekeyPrefix}<번호>`로** 바뀝니다.\n');
+  const named = dry();
   const previous = [file.name, ...file.history.map(h => h.name)].join(', ');
-  assert.ok(out.notes.includes(`## 이름이 ζnote로 바뀌었습니다\n\n- 이전 이름(${previous})으로`), out.notes.slice(0, 600));
-  assert.ok(out.notes.includes('**기본 인용 키가 `zeta<번호>`로**')); assert.doesNotMatch(out.notes, /\{(name|previous|citekeyPrefix)\}|<!--/);
-  for (const name of [file.name, file.product, file.id]) assert.ok(!out.notes.replace(`이전 이름(${previous})`, '').includes(name), name);
+  assert.ok(named.notes.includes(`## 이름이 ζnote로 바뀌었습니다\n\n- 이전 이름(${previous})으로`), named.notes.slice(0, 600));
+  assert.ok(named.notes.includes('**기본 인용 키가 `zeta<번호>`로**')); assert.doesNotMatch(named.notes, /\{(name|previous|citekeyPrefix)\}|<!--/);
+  for (const name of [file.name, file.product, file.id]) assert.ok(!named.notes.replace(`이전 이름(${previous})`, '').includes(name), name);
+  assert.doesNotMatch(out.notes, /이름이 .*바뀌었습니다/, 'the repository itself has no such section now');
   fs.rmSync(path.join(dir, 'docs', 'release', 'name-change.md'));
-  const after = dry().notes; assert.doesNotMatch(after, /이름이 .*바뀌었습니다/); assert.match(after, /## 다운로드 및 실행[\s\S]*## 주요 변경/);
+  const after = dry().notes; assert.doesNotMatch(after, /이름이 .*바뀌었습니다/); assert.match(after, /## 다운로드 및 실행[\s\S]*## 주요 기능/);
   void renamed;
 });
 
@@ -166,4 +171,21 @@ test('the code, scripts, CI and tests name the app only through the name file', 
     text.split('\n').forEach((line, i) => { if (brand.test(KEPT.reduce((rest, kept) => rest.replace(kept, ''), line))) left.push(`${file}:${i + 1}: ${line.trim().slice(0, 140)}`); });
   }
   assert.deepEqual(left, [], `the brand written out:\n${left.join('\n')}`);
+});
+
+// The Debian package (scripts/archive.py build_deb): its name, its control file and its desktop entry are made from the
+// name file and package.json, with both spellings of the libraries Ubuntu renamed in 24.04.
+test('the release script describes the Debian package from the name file', t => {
+  const { execFileSync, spawnSync } = require('node:child_process');
+  if (spawnSync('python3', ['--version']).status !== 0) return t.skip('python3 is not available');
+  const appName = require('../core/app-name.cjs'), pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const out = JSON.parse(execFileSync('python3', ['scripts/archive.py', '--dry-run'], { cwd: root, encoding: 'utf8' }));
+  assert.equal(out.deb, `${appName.id}_${pkg.version}_amd64.deb`);
+  for (const line of [`Package: ${appName.id}`, `Version: ${pkg.version}`, 'Architecture: amd64', 'libasound2 | libasound2t64', 'libgtk-3-0 | libgtk-3-0t64']) assert.ok(out.control.includes(line), line);
+  assert.match(out.control, /^Maintainer: .+ <[^<>@\s]+@[^<>\s]+>$/m);
+  assert.ok(out.control.endsWith('\n'), 'the control file ends with a new line');
+  for (const line of [`Name=${appName.name}`, `Exec=/opt/${appName.id}/${appName.id}`, `Icon=${appName.id}`, 'Terminal=false']) assert.ok(out.desktop.split('\n').includes(line), line);
+  // The app does not open a file it is started with, so it does not offer itself for PDFs.
+  assert.doesNotMatch(out.desktop, /MimeType|%[fFuU]/); assert.doesNotMatch(out.notes, /PDF 연결 프로그램/);
+  assert.match(out.notes, new RegExp(`sudo apt install \\./${appName.id}_`));
 });

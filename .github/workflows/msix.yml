@@ -1,0 +1,58 @@
+name: Build Microsoft Store package
+
+# Makes the MSIX package to upload in Partner Center (docs/DEVELOPMENT.md, "Microsoft Store 패키지"). It is kept as
+# this run's artifact, not attached to a release: the Store signs and distributes it.
+on:
+  workflow_dispatch:
+  # Also when the package's own files change, so that a change to them is seen to build.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/msix.yml', 'scripts/msix.mjs', 'core/app-name.json', 'package.json', 'brand/msix/**']
+
+permissions:
+  contents: read
+
+jobs:
+  msix:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install build tools
+        run: npm ci --ignore-scripts
+      - name: Build the Windows app
+        run: npm run package:win
+      - name: Lay out the package
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+          MSIX_DISPLAY_NAME: ${{ vars.MSIX_DISPLAY_NAME }}
+        run: node scripts/msix.mjs
+      - name: Make the MSIX package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $id = node -p "require('./core/app-name.json').id"
+          $version = node -p "require('./package.json').version"
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName | Select-Object -Last 1
+          if (-not $makeappx) { throw 'MakeAppx (Windows SDK) was not found' }
+          # resources.pri lets Windows pick the icon for each size (the taskbar's unplated ones among them).
+          $makepri = Join-Path $makeappx.DirectoryName 'makepri.exe'
+          & $makepri createconfig /o /cf priconfig.xml /dq en-US
+          if ($LASTEXITCODE -ne 0) { throw "MakePri createconfig failed ($LASTEXITCODE)" }
+          & $makepri new /o /pr "release\$id-win32-x64" /cf priconfig.xml /of "release\$id-win32-x64\resources.pri"
+          if ($LASTEXITCODE -ne 0) { throw "MakePri new failed ($LASTEXITCODE)" }
+          New-Item -ItemType Directory -Force msix | Out-Null
+          & $makeappx.FullName pack /o /d "release\$id-win32-x64" /p "msix\$id-$version-x64.msix"
+          if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed ($LASTEXITCODE)" }
+          Get-Item "msix\$id-$version-x64.msix" | Format-List Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msix
+          path: msix/*.msix
+          if-no-files-found: error

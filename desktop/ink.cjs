@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const { atomicJson, readJson, KeyedQueue } = require('./storage.cjs');
 const { VAULT_DIR } = require('./legacy.cjs');
 const { joinLineBoxes, highlightBoxes, validTextLook, cleanTextLook, hexColor, textLook, textBoxFrame, textBorderDash } = require('../core/ink-marks.cjs');
+const { vaultDirectory } = require('./vault-folder.cjs');
 
 // pen/highlighter: free strokes; text: a page memo at a point; mark: a
 // highlight anchored to selected text (its line boxes and quote), or with
@@ -104,7 +105,7 @@ class InkStore extends KeyedQueue {
   constructor(library) { super(); this.library = library; this.states = new Map(); this.hashes = new Map(); this.keptBases = new Set(); }
   async folder(attachmentId) {
     const base = path.join(this.library.root, VAULT_DIR, 'ink');
-    await fs.mkdir(path.join(base, attachmentId), { recursive: true });
+    await vaultDirectory(this.library.root, path.join(base, attachmentId));
     const folder = path.join(base, attachmentId);
     if (await fs.realpath(folder) !== folder) throw Error(tr('필기 폴더의 심볼릭 링크는 지원하지 않습니다.'));
     return folder;

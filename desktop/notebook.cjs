@@ -50,7 +50,7 @@ function validNotebook(n) {
 }
 class NotebookStore extends KeyedQueue {
   constructor(library) { super(); this.library = library; }
-  async dir(...parts) { const dir = path.join(this.library.root, VAULT_DIR, 'notebooks', ...parts); await fs.mkdir(dir, { recursive: true }); return dir; }
+  async dir(...parts) { const dir = path.join(this.library.root, VAULT_DIR, 'notebooks', ...parts); await vaultDirectory(this.library.root, dir); return dir; }
   async list() {
     const dir = await this.dir(), out = [];
     for (const name of await fs.readdir(dir)) {
@@ -122,6 +122,7 @@ class NotebookStore extends KeyedQueue {
 
 // Print HTML for a notebook: page templates, items and strokes in page points.
 const { escapeHtml: esc } = require('../core/pdf-layout.js');
+const { vaultDirectory } = require('./vault-folder.cjs');
 const n3 = v => Math.round(v * 100) / 100;
 // A slice (a whiteboard's sheet) draws the page's lines and strokes that fall in it, at their places on the page, so
 // the lines run on from one sheet to the next; without one, the whole page.

@@ -113,11 +113,13 @@ function compareMetadata(current,candidate){
 // "Surname_Year_Title.pdf" for an item's PDF: the first author's family name,
 // the year and at most 60 characters of the title (cut at a word), without
 // characters a file system refuses. Missing parts are left out, never invented.
-function fileNameFor(paper){
+// With style 'title' the name is the title alone (at most 150 characters, cut at a word): "Title.pdf".
+function fileNameFor(paper,style){
   const clean=value=>String(value||'').normalize('NFC').replace(/[<>:"/\\|?*\x00-\x1f]/g,' ').replace(/\s+/g,' ').trim();
   const first=creatorsOf(paper)[0],surname=clean(first?.family||(first?.literal||'').split(/[,\s]/)[0]);
   const year=(/\b\d{4}\b/.exec(`${paper.year||''} ${paper.date||''}`)||[''])[0];
   let title=clean(paper.title).replace(/[.\s]+$/,'');
+  if(style==='title'){if(title.length>150){title=title.slice(0,150);const space=title.lastIndexOf(' ');if(space>75)title=title.slice(0,space);}title=title.replace(/^[.\s]+/,'').replace(/[.\s]+$/,'');return title?title+'.pdf':null;}
   if(title.length>60){title=title.slice(0,60);const space=title.lastIndexOf(' ');if(space>30)title=title.slice(0,space);}
   const stem=[surname,year,title].filter(Boolean).join('_').replace(/^[.\s]+/,'').slice(0,190);
   return stem?stem+'.pdf':null;

@@ -33,7 +33,7 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
   const noKorean = (text, where) => { assert.ok(text.trim(), `${where}: something is shown`); assert.doesNotMatch(text, hangul, `${where}: ${text.match(new RegExp(`.{0,30}${hangul.source}.{0,30}`))?.[0]}`); };
   // What a reader sees in the nodes a selector finds: their text and their labels, titles and placeholders.
   // Language names are written in their own language on purpose, so the language pickers are left out.
-  const shownIn = (p, selector, leaveOut = '#welcome-language, #language-ui, #language-translation, #language-ai, #translation-language') => p.evaluate(([selector, leaveOut]) => {
+  const shownIn = (p, selector, leaveOut = '.welcome-language, .language-first [data-first-language], #language-ui, #language-translation, #language-ai, #translation-language') => p.evaluate(([selector, leaveOut]) => {
     const out = [...document.querySelectorAll(leaveOut)], was = out.map(node => node.hidden); out.forEach(node => { node.hidden = true; });
     try { return [...document.querySelectorAll(selector)].map(node => [node.innerText, ...[node, ...node.querySelectorAll('*')].filter(element => !out.some(o => o.contains(element))).flatMap(element => ['aria-label', 'title', 'placeholder'].map(name => element.getAttribute(name) || ''))].join('\n')).join('\n'); }
     finally { out.forEach((node, i) => { node.hidden = was[i]; }); }
@@ -76,9 +76,51 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
       assert.deepEqual(info.choices.translation, [{ code: 'ko', name: '한국어' }]); assert.equal(info.choices.ai.length, 8);
       assert.equal(info.aiResolved, expected); assert.equal(info.translation, null); assert.equal(info.ai, null);
       assert.equal(info.translationAsk, expected === 'en', 'an English system has no translation language yet');
+      assert.equal(info.askUi, true, 'a new install is asked for its display language');
       await app.close(); app = null;
       // The choice made for the new install is kept with the next write of the settings, so it does not change with the system later.
       assert.equal((await readSettings(profile)).language.ui, expected);
+    }
+    // The first start of a new install asks for the display language (renderer.js languageFirst), once.
+    {
+      const loaded = (p, ui) => p.waitForFunction(ui => window.appApi?.language?.ui === ui && document.documentElement.lang === ui && typeof showShortcuts === 'function', ui);
+      // A system in Japanese: English is picked ahead, nothing else can be pressed, and Korean on a press starts in Korean.
+      let profile = path.join(temp, 'first-ja'), p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'ja-JP' });
+      await p.locator('.language-first').waitFor();
+      assert.equal(await p.locator('[data-action="storage"]').count(), 0, 'nothing else to press before a language is chosen');
+      assert.deepEqual(await p.locator('[data-first-language]').evaluateAll(list => list.map(b => [b.dataset.firstLanguage, b.getAttribute('aria-pressed')])), [['ko', 'false'], ['en', 'true']]);
+      assert.match(await p.locator('.language-first').textContent(), /언어를 선택하세요[\s\S]*Choose your language/, 'the question is put in both languages');
+      assert.equal(await p.evaluate(() => document.activeElement?.dataset.action), 'first-language-go', 'the focus is on the button that goes on');
+      await p.setViewportSize({ width: 800, height: 600 }); await unfitAt(p, 'the language question');
+      await p.locator('[data-first-language="ko"]').click(); assert.equal(await p.locator('[data-first-language="ko"]').getAttribute('aria-pressed'), 'true');
+      await p.locator('[data-action="first-language-go"]').click(); await loaded(p, 'ko');
+      await p.locator('[data-action="storage"]').first().waitFor(); assert.equal(await p.locator('.language-first').count(), 0);
+      let kept = await readSettings(profile); assert.equal(kept.language.ui, 'ko'); assert.equal('languageAsk' in kept, false, 'answered: the key is gone');
+      await app.close(); app = null;
+      p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'ja-JP' }); await p.locator('[data-action="storage"]').first().waitFor();
+      assert.equal(await p.locator('.language-first').count(), 0, 'the next start does not ask'); assert.equal(await p.evaluate(() => document.documentElement.lang), 'ko');
+      await app.close(); app = null;
+      // The language picked ahead kept as it is: Enter alone goes on, with no reload.
+      profile = path.join(temp, 'first-ko'); p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'ko-KR' }); await p.locator('.language-first').waitFor();
+      assert.equal(await p.locator('[data-first-language="ko"]').getAttribute('aria-pressed'), 'true');
+      let loads = 0; p.on('load', () => { loads++; });
+      await p.keyboard.press('Enter'); await p.locator('[data-action="storage"]').first().waitFor();
+      kept = await readSettings(profile); assert.equal(kept.language.ui, 'ko'); assert.equal('languageAsk' in kept, false); assert.equal(loads, 0, 'the same language loads nothing again');
+      await app.close(); app = null;
+      // Closed without an answer: asked again at the next start.
+      profile = path.join(temp, 'first-unanswered'); p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'en-US' }); await p.locator('.language-first').waitFor();
+      await app.close(); app = null;
+      p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'en-US' }); await p.locator('.language-first').waitFor();
+      // The settings cannot be written: it is told, and the start screen follows for this run.
+      await app.evaluate(() => { const fs = process.mainModule.require('node:fs/promises'), rename = fs.rename; fs.rename = async (from, to) => { if (String(to).endsWith('settings.json')) throw Object.assign(Error('EACCES: permission denied'), { code: 'EACCES' }); return rename(from, to); }; });
+      await p.locator('[data-action="first-language-go"]').click(); await p.locator('#toast').waitFor(); await p.locator('[data-action="storage"]').first().waitFor();
+      assert.equal(await p.locator('.language-first').count(), 0);
+      await app.close(); app = null;
+      // An install in use (a settings file as 1.0.0 left it, without the key) is not asked.
+      profile = path.join(temp, 'first-in-use'); await fs.mkdir(profile); await fs.writeFile(path.join(profile, 'settings.json'), JSON.stringify({ recents: [] }));
+      p = await launch(profile, undefined, { APP_OS_LANGUAGES: 'en-US' }); await p.locator('[data-action="storage"]').first().waitFor();
+      assert.equal(await p.locator('.language-first').count(), 0); assert.equal(await p.evaluate(() => document.documentElement.lang), 'ko');
+      await app.close(); app = null;
     }
     // An English screen on a system with a language a translation can be in takes that language without asking (DEVELOPMENT.md 언어 설정).
     {
@@ -165,12 +207,13 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
       const stored = async (key, value) => { for (let i = 0; i < 100 && (await readSettings(profile)).language[key] !== value; i++) await new Promise(r => setTimeout(r, 50)); assert.equal((await readSettings(profile)).language[key], value, key); };
       assert.equal(await p.evaluate(() => document.documentElement.lang), 'ko');
       // The start screen: each language named in itself; a choice loads the window again in that language.
-      await p.locator('#welcome-language').waitFor();
-      assert.deepEqual(await options('#welcome-language'), [['ko', '한국어'], ['en', 'English']]); assert.equal(await p.locator('#welcome-language').inputValue(), 'ko');
-      await p.locator('#welcome-language').selectOption('en'); await loaded('en');
-      assert.equal(await p.evaluate(() => appI18n.uiLanguage()), 'en'); assert.equal(await p.locator('#welcome-language').inputValue(), 'en');
+      await p.locator('.welcome-language [data-welcome-language]').first().waitFor();
+      assert.deepEqual(await p.locator('.welcome-language [data-welcome-language]').evaluateAll(list => list.map(b => [b.dataset.welcomeLanguage, b.textContent.trim(), b.getAttribute('aria-pressed')])), [['ko', '한국어', 'true'], ['en', 'English', 'false']]);
+      assert.equal(await p.locator('#welcome-language').count(), 0, 'the list box is gone');
+      await p.locator('[data-welcome-language="en"]').click(); await loaded('en');
+      assert.equal(await p.evaluate(() => appI18n.uiLanguage()), 'en'); assert.equal(await p.locator('[data-welcome-language="en"]').getAttribute('aria-pressed'), 'true');
       assert.equal((await readSettings(profile)).language.ui, 'en');
-      await p.locator('#welcome-language').selectOption('ko'); await loaded('ko');
+      await p.locator('[data-welcome-language="ko"]').click(); await loaded('ko');
       assert.match(await p.locator('.welcome-guide').textContent(), /폴더를 저장소로 연결/); assert.equal((await readSettings(profile)).language.ui, 'ko');
       // The settings: a 언어 group above 모양, with the three lists.
       await app.evaluate(({ dialog }, folder) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] }); }, folder);

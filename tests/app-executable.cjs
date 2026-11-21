@@ -6,6 +6,9 @@ const fs = require('node:fs');
 // The smokes read the Korean screen: a new profile would otherwise take the system's language
 // (desktop/language.cjs). A test that wants another language sets APP_UI_LANG itself.
 process.env.APP_UI_LANG ||= 'ko';
+// No smoke asks GitHub whether a newer release is out (desktop/main.cjs checkForUpdate); tests/update-smoke.cjs
+// names its own server.
+process.env.APP_UPDATE_FEED ||= 'off';
 const path = require('node:path');
 const appName = require('../core/app-name.cjs');
 module.exports = function appExecutable(root) {

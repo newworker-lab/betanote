@@ -7,10 +7,11 @@ const path = require('node:path');
 const {tr}=require('../core/i18n.js');
 const { atomicJson, readJson } = require('./storage.cjs');
 const { VAULT_DIR } = require('./legacy.cjs');
+const { vaultDirectory } = require('./vault-folder.cjs');
 
 class CorrectionStore {
   constructor(library) { this.library = library; this.chain = Promise.resolve(); }
-  async file(attachmentId) { const dir = path.join(this.library.root, VAULT_DIR, 'corrections'); await fs.mkdir(dir, { recursive: true }); return path.join(dir, attachmentId + '.json'); }
+  async file(attachmentId) { const dir = path.join(this.library.root, VAULT_DIR, 'corrections'); await vaultDirectory(this.library.root, dir); return path.join(dir, attachmentId + '.json'); }
   async read(paperId, attachmentId) { const a = this.library.attachment(paperId, attachmentId); return readJson(await this.file(a.id), { version: 1, entries: {} }); }
   // Corrections from another source version are kept but not applied.
   async apply(paperId, attachmentId, record) {

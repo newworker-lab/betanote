@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('appApi', {
   restoreBackup:(id,backupId)=>ipcRenderer.invoke('vault-restore',id,backupId),
   moveAttachment:(id,paperId,attachmentId,folder,name)=>ipcRenderer.invoke('move-attachment',id,paperId,attachmentId,folder,name),
   autofillBibliography:(id,paperId,doi)=>ipcRenderer.invoke('autofill-bibliography',id,paperId,doi),
-  renameAttachments:(id,paperIds)=>ipcRenderer.invoke('rename-attachments',id,paperIds),
+  renameAttachments:(id,paperIds,style)=>ipcRenderer.invoke('rename-attachments',id,paperIds,style),
   relinkAttachment:(id,paperId,attachmentId)=>ipcRenderer.invoke('relink-attachment',id,paperId,attachmentId),
   trashAttachment:(id,paperId,attachmentId,restore=false)=>ipcRenderer.invoke('trash-attachment',id,paperId,attachmentId,restore),
   trashPaper:(id,paperId,restore=false)=>ipcRenderer.invoke('trash-paper',id,paperId,restore),
@@ -174,9 +174,15 @@ contextBridge.exposeInMainWorld('appApi', {
   openThemesFolder: () => ipcRenderer.invoke('themes-open-folder'),
   checkVault: id => ipcRenderer.invoke('vault-check', id),
   reloadVault: (id, notes) => ipcRenderer.invoke('vault-reload', id, notes),
-  onVaultChangedOutside: callback => { ipcRenderer.on('vault-changed-outside', () => callback()); },
+  onVaultChangedOutside: callback => { ipcRenderer.on('vault-changed-outside', (_event, info) => callback(info)); },
+  relocateVault: (id, pending) => ipcRenderer.invoke('vault-relocate', id, pending),
   onMenuCommand: callback => { ipcRenderer.on('menu-command', (_event, command, arg) => callback(command, arg)); },
   onThemesChanged: callback => { ipcRenderer.on('themes-changed', () => callback()); },
+  // The new-version notice: what the last check found, its page opened in the browser, a version skipped.
+  pendingUpdate: () => ipcRenderer.invoke('update-pending'),
+  openUpdate: () => ipcRenderer.invoke('update-open'),
+  skipUpdate: () => ipcRenderer.invoke('update-skip'),
+  onUpdateAvailable: callback => { ipcRenderer.on('update-available', (_event, info) => callback(info)); },
   onVaultFilesChanged: callback => { ipcRenderer.on('vault-files-changed', (_event, id) => callback(id)); },
   revealOriginal: (id, paperId) => ipcRenderer.invoke('reveal-original', id, paperId)
 });

@@ -5,9 +5,22 @@
 // The main process refuses a save once library.json differs from what it last read or
 // wrote. The page then offers to read the vault again; notes not yet saved go with the
 // request and are merged (storage.cjs mergePendingNotes).
-let outsideChange={asked:false,waiting:false,checkedAt:0};
-function askVaultReload(){
+// When the vault's folder itself is gone (renamed, moved, its drive taken out: info.gone), there is nothing to read
+// again where it was: the page asks where the folder is now instead (vault-relocate).
+let outsideChange={asked:false,waiting:false,checkedAt:0,gone:false};
+function askVaultReload(info){
   if(!state.storageKey||state.screen==='welcome')return;
+  if(info)outsideChange.gone=info.gone===true;
+  if(outsideChange.gone){
+    if(dialog.open&&!dialog.querySelector('[data-action="vault-relocate"]')){
+      if(!outsideChange.waiting){outsideChange.waiting=true;toast(tr('저장소 폴더를 찾을 수 없습니다. 이 창을 닫으면 다시 연결을 안내합니다.'));dialog.addEventListener('close',()=>{outsideChange.waiting=false;setTimeout(askVaultReload,0);},{once:true});}
+      return;
+    }
+    if(dialog.open)return;
+    outsideChange.asked=true;
+    modal(tr('저장소 폴더를 찾을 수 없습니다'),`<p>${tr('저장소 폴더의 이름을 바꿨거나 다른 곳으로 옮겼거나, 드라이브가 빠졌습니다. 자료를 잃지 않도록 저장을 멈췄습니다.')}</p><p>${tr('<strong>폴더 다시 고르기</strong>로 그 폴더를 고르면 재시작 없이 이어서 씁니다. 아직 저장하지 못한 메모는 함께 보존합니다.')}</p><p class="small muted">${tr('드라이브가 빠진 것이라면 다시 연결한 뒤 같은 폴더를 고르세요.')}</p>`,btn(tr('나중에'),'close')+btn(tr('폴더 다시 고르기'),'vault-relocate','primary'));
+    return;
+  }
   if(dialog.open){
     // Another dialog is in use: say so now and ask once it closes.
     if(!outsideChange.waiting){outsideChange.waiting=true;toast(tr('저장소가 다른 프로그램에서 변경됐습니다. 이 창을 닫으면 다시 읽기를 안내합니다.'));dialog.addEventListener('close',()=>{outsideChange.waiting=false;setTimeout(askVaultReload,0);},{once:true});}
@@ -26,12 +39,22 @@ async function reloadVaultFromDisk(){
   const {kept=0,conflicts=0}=snapshot.reloaded||{};
   toast(conflicts?tr('저장소를 다시 읽었습니다. 양쪽에서 고친 메모 {n}개는 두 내용을 모두 남겼습니다.',{n:conflicts}):kept?tr('저장소를 다시 읽었습니다. 저장하지 못한 메모 {n}개를 보존했습니다.',{n:kept}):tr('저장소를 다시 읽었습니다.'));
 }
-window.appApi.onVaultChangedOutside?.(()=>askVaultReload());
+async function relocateVault(){
+  const id=state.storageKey;if(!id)return;
+  clearTimeout(noteSaveTimer);await pendingNotes.catch(()=>{});
+  const snapshot=await window.appApi.relocateVault(id,JSON.parse(JSON.stringify(notes)));
+  if(!snapshot||state.storageKey!==id)return; // the folder dialog was closed: the question stays
+  if(dialog.open)dialog.close();
+  outsideChange.asked=false;outsideChange.gone=false;applyItemSnapshot(snapshot);
+  const {kept=0,conflicts=0}=snapshot.reloaded||{};
+  toast(conflicts?tr('저장소를 다시 연결했습니다. 양쪽에서 고친 메모 {n}개는 두 내용을 모두 남겼습니다.',{n:conflicts}):kept?tr('저장소를 다시 연결했습니다. 저장하지 못한 메모 {n}개를 보존했습니다.',{n:kept}):tr('저장소를 다시 연결했습니다.'));
+}
+window.appApi.onVaultChangedOutside?.(info=>askVaultReload(info));
 // Coming back to the window is when an outside change is most likely: find it before the next save fails.
 window.addEventListener('focus',()=>{
   const id=state.storageKey,now=Date.now();if(!id||outsideChange.asked||now-outsideChange.checkedAt<5000||!window.appApi.checkVault)return;
   outsideChange.checkedAt=now;
-  window.appApi.checkVault(id).then(result=>{if(result?.changed&&state.storageKey===id)askVaultReload();}).catch(()=>{});
+  window.appApi.checkVault(id).then(result=>{if((result?.changed||result?.gone)&&state.storageKey===id)askVaultReload(result);}).catch(()=>{});
 });
 
 // ---- 단축키 ----
@@ -55,15 +78,16 @@ document.addEventListener('keydown',event=>{
 // ---- 설정 → 알림·도움말 ----
 function generalSummary(){return featureOn('notifications')?tr('번역 완료 알림 켬'):tr('번역 완료 알림 끔');}
 function generalSection(){
-  return `<label class="llm-check"><input type="checkbox" id="kn-notify" ${featureOn('notifications')?'checked':''}> ${tr('번역이 끝나면 알림 보내기')}</label><p class="small muted">${tr('창이 뒤에 있을 때만 시스템 알림을 보냅니다. 번역 진행률은 작업 표시줄의 앱 아이콘에도 표시됩니다.')}</p><div class="row">${btn(tr('단축키 보기'),'shortcuts')}</div>`;
+  return `<label class="llm-check"><input type="checkbox" id="kn-notify" ${featureOn('notifications')?'checked':''}> ${tr('번역이 끝나면 알림 보내기')}</label><p class="small muted">${tr('창이 뒤에 있을 때만 시스템 알림을 보냅니다. 번역 진행률은 작업 표시줄의 앱 아이콘에도 표시됩니다.')}</p><label class="llm-check"><input type="checkbox" id="kn-update" ${featureOn('updateCheck')?'checked':''}> ${tr('시작할 때 새 버전 확인')}</label><p class="small muted">${tr('하루에 한 번까지 GitHub의 공개 릴리스 정보만 확인합니다. 자료나 사용 기록은 보내지 않으며, 새 버전이 있으면 알리기만 하고 설치하지 않습니다.')}</p><div class="row">${btn(tr('단축키 보기'),'shortcuts')}</div>`;
 }
 document.addEventListener('change',event=>{
-  if(event.target.id!=='kn-notify')return;
+  const feature={'kn-notify':'notifications','kn-update':'updateCheck'}[event.target.id];if(!feature)return;
   const box=event.target,on=box.checked;
-  window.appApi.featureSet('notifications',on).then(features=>{desktopPreferences.features=features;const summary=document.querySelector('[data-llm-section="general"] summary small');if(summary)summary.textContent=generalSummary();},error=>{box.checked=!on;toast(plainError(error));});
+  window.appApi.featureSet(feature,on).then(features=>{desktopPreferences.features=features;const summary=document.querySelector('[data-llm-section="general"] summary small');if(summary)summary.textContent=generalSummary();},error=>{box.checked=!on;toast(plainError(error));});
 });
 Object.assign(actions,{
   'vault-reload':runDesktop(reloadVaultFromDisk),
+  'vault-relocate':runDesktop(relocateVault),
   'shortcuts':runDesktop(async()=>{showShortcuts();}),
 });
 
@@ -132,3 +156,16 @@ async function followVaultFiles(){
   finally{vaultFiles.busy=false;if(vaultFiles.pending)vaultFiles.timer=setTimeout(followVaultFiles,2000);}
 }
 window.appApi.onVaultFilesChanged?.(id=>{if(id!==state.storageKey)return;vaultFiles.pending=true;followVaultFiles();});
+
+// The new-version notice (main.cjs checkForUpdate): told once a run, after any dialog in use and after the first start's
+// language question. 내려받기 opens the release's page in the browser; nothing is installed from here.
+let updateTold=false;
+function showUpdate(info){
+  if(!info||updateTold)return;
+  if(dialog.open||document.querySelector('.language-first')){setTimeout(()=>showUpdate(info),1500);return;}
+  updateTold=true;
+  modal(tr('새 버전이 있습니다'),`<p>${tr('{app} {version}이(가) 나왔습니다. 지금 쓰는 버전은 {current}입니다.',{app:esc(appName.name),version:esc(info.version),current:esc(info.current)})}</p><p class="small muted">${tr('내려받기를 누르면 브라우저에서 릴리스 페이지가 열립니다. 새 판으로 바꿔도 저장소의 자료와 설정은 그대로입니다.')}</p>`,btn(tr('나중에'),'close')+btn(tr('이 버전 건너뛰기'),'update-skip')+btn(tr('내려받기'),'update-open','primary'));
+}
+Object.assign(actions,{'update-open':runDesktop(async()=>{await window.appApi.openUpdate();dialog.close();}),'update-skip':runDesktop(async()=>{await window.appApi.skipUpdate();dialog.close();})});
+window.appApi.onUpdateAvailable?.(showUpdate);
+window.appApi.pendingUpdate?.().then(showUpdate,()=>{});

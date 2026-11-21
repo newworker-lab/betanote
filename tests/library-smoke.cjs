@@ -353,6 +353,12 @@ async function samplePdf(file, texts) { const doc = await PDFDocument.create(), 
     await p.evaluate(id => { state.selected = id; return actions['rename-files'](); }, filled.id); await p.locator('#toast').filter({ hasText: '파일 이름 정리: 1개 변경' }).waitFor();
     const renamed = await p.evaluate(id => papers.find(p => p.id === id).attachments[0], filled.id);
     assert.equal(renamed.name, 'Doe_2024_Crossref title differs.pdf'); assert.equal(renamed.fileName, renamed.name); await fs.access(path.join(vault, renamed.folder, renamed.fileName));
+    // 서지정보's 제목으로 파일 이름: the title alone; the file on disk follows, and a second press changes nothing.
+    await p.evaluate(id => { state.selected = id; }, filled.id); assert.ok(await p.evaluate(id => bibliography(papers.find(p => p.id === id)).includes('data-action="rename-file-title"'), filled.id), 'the bibliography offers the title as the file name');
+    await p.evaluate(() => actions['rename-file-title']()); await p.locator('#toast').filter({ hasText: '파일 이름을 제목으로 바꿨습니다.' }).waitFor();
+    const titled = await p.evaluate(id => papers.find(p => p.id === id).attachments[0], filled.id);
+    assert.equal(titled.name, 'Crossref title differs.pdf'); await fs.access(path.join(vault, titled.folder, titled.fileName)); await assert.rejects(fs.access(path.join(vault, renamed.folder, renamed.fileName)));
+    await p.evaluate(() => actions['rename-file-title']()); await p.locator('#toast').filter({ hasText: '파일 이름이 이미 제목과 같습니다.' }).waitFor();
     // Without a printed DOI the record still fills: a DOI in the document information, a near-identical
     // title in Crossref, an arXiv number (DataCite), else the PDF's own title and authors; never a guess from the layout.
     const byFile = name => p.evaluate(n => { const x = papers.find(q => q.attachments.some(a => a.name === n || a.fileName === n)); return x && { title: x.title, authors: x.authors, year: x.year, doi: x.doi || '', journal: x.journal || '', type: x.type, id: x.id }; }, name);

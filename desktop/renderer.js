@@ -174,11 +174,42 @@ function applySnapshot(snapshot) {
 // the screen's language may not find the settings. Each language is named in itself.
 paths.globe='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9 M12 3c-2.4 2.5-3.6 5.5-3.6 9s1.2 6.5 3.6 9';
 const languageOptions=(list,chosen)=>list.map(c=>`<option value="${esc(c.code)}" ${c.code===chosen?'selected':''}>${esc(c.name)}</option>`).join('');
+// The language settings as the page has them now (appearance.js languageNow once that script has run).
+const languageState=()=>{try{return languageNow||window.appApi.language;}catch{return window.appApi.language;}};
+// The start screen's switch: a button for each display language, the one in use pressed.
 function welcomeLanguage(){
-  const info=window.appApi.language;if(!info?.choices?.ui?.length)return '';
-  return `<label class="welcome-language" title="${esc(tr('화면 언어'))}">${icon('globe')}<select id="welcome-language" aria-label="${esc(tr('화면 언어'))}">${languageOptions(info.choices.ui,info.ui)}</select></label>`;
+  const info=languageState();if(!info?.choices?.ui?.length)return '';
+  return `<div class="welcome-language" role="group" aria-label="${esc(tr('화면 언어'))}" title="${esc(tr('화면 언어'))}">${icon('globe')}<span class="segmented">${info.choices.ui.map(c=>`<button type="button" class="${c.code===info.ui?'active':''}" data-welcome-language="${esc(c.code)}" aria-pressed="${c.code===info.ui}">${esc(c.name)}</button>`).join('')}</span></div>`;
 }
+// The first start of a new install (language.cjs languageAskAtStart): the display language is asked for before anything
+// else is offered. The question is put in both languages, since the reader may know only one; each language is named in
+// itself, with its name in the other below. The language the system gave is picked ahead and the focus is on 시작하기,
+// so Enter alone goes on.
+let firstLanguage=null;
+function languageFirst(){
+  const info=languageState(),chosen=firstLanguage||info.ui,inOther={ko:trIn('en','한국어'),en:trIn('ko','영어')};
+  // Once the card is on the page the focus goes to 시작하기 (unless it is already in the card): this function only
+  // returns the markup, and render is replaced further down this file, so the focus is set after the next frame.
+  requestAnimationFrame(()=>{const go=document.querySelector('.language-first [data-action="first-language-go"]');if(go&&!document.activeElement?.closest?.('.language-first'))go.focus();});
+  const title=trIn('ko','언어를 선택하세요'),titleSecond=trIn('en','언어를 선택하세요'),go=trIn('ko','시작하기'),goSecond=trIn('en','시작하기'),later=trIn('ko','나중에 설정에서 바꿀 수 있습니다.'),laterSecond=trIn('en','나중에 설정에서 바꿀 수 있습니다.');
+  return `<main class="welcome language-first"><section class="language-first-card" aria-labelledby="language-first-title">${logo()}<h1 id="language-first-title">${esc(title)}</h1><p class="language-first-second">${esc(titleSecond)}</p><div class="language-first-pick" role="group" aria-labelledby="language-first-title">${info.choices.ui.map(c=>`<button type="button" class="${c.code===chosen?'active':''}" data-first-language="${esc(c.code)}" aria-pressed="${c.code===chosen}"><strong>${esc(c.name)}</strong><small>${esc(inOther[c.code]||'')}</small></button>`).join('')}</div><button type="button" class="primary" data-action="first-language-go">${esc(go)} · ${esc(goSecond)}</button><p class="small muted">${esc(later)}<br>${esc(laterSecond)}</p></section></main>`;
+}
+document.addEventListener('click',event=>{
+  const pick=event.target.closest?.('[data-first-language]');
+  if(pick){firstLanguage=pick.dataset.firstLanguage;document.querySelectorAll('[data-first-language]').forEach(b=>{const on=b===pick;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});return;}
+  const to=event.target.closest?.('[data-welcome-language]');if(to&&typeof chooseLanguage==='function')chooseLanguage({id:'welcome-language',value:to.dataset.welcomeLanguage});
+});
+// 시작하기: the choice is kept (and the question answered) by set-language. Another language than the one on screen loads
+// the window again, so nothing is drawn here; the same one draws the start screen. A choice that could not be kept is
+// told, and the start screen follows for this run (the question comes back at the next start).
+actions['first-language-go']=async()=>{
+  const now=languageState(),code=firstLanguage||now.ui;
+  try{const info=await window.appApi.setLanguage({ui:code});if(code!==now.ui)return;languageNow=info;}
+  catch(error){toast(plainError(error));languageNow={...now,askUi:false};}
+  firstLanguage=null;render();
+};
 function welcome() {
+  if(languageState()?.askUi)return languageFirst();
   return `<main class="welcome"><header>${logo()}${welcomeLanguage()}</header><section class="welcome-hero"><h1>${tr('저장소')}</h1><button class="primary open-folder" data-action="storage">${icon('vault')} ${tr('저장소 연결')} ${icon('arrow')}</button></section><section class="recent"><h3>${tr('최근 저장소')}</h3>${desktopPreferences.recents.length ? desktopPreferences.recents.map(r => `<div class="recent-row"><button class="recent-item" data-desktop-recent="${esc(r.key||r.id)}" title="${tr('열기 · Delete 키로 목록에서 삭제')}">${icon('vault')}<strong>${esc(r.name)}${r.where?`<small class="recent-where">${esc(r.where)}</small>`:''}</strong><span>${tr('바로 열기')} ${icon('arrow')}</span></button><button type="button" class="row-more recent-remove" data-recent-remove="${esc(r.key||r.id)}" title="${tr('최근 목록에서 삭제 (폴더는 그대로)')}" aria-label="${tr('{name} 최근 목록에서 삭제',{name:esc(r.name)})}">${icon('trash')}</button></div>`).join('') : `<p class="recent-empty">${tr('폴더를 연결하면 여기에 표시됩니다.')}</p>`}</section>${desktopPreferences.recents.length?'':welcomeGuide()}</main>`;
 };
 let vaultFolders=[],expandedFolders=new Set(['','papers']);
@@ -1330,13 +1361,16 @@ paths.figure='M4 4h16v16H4z M4 15.5l5-5 4.5 4.5 2.5-2.5 4 4 M15.5 8.5h.01';
 let figureSession=null;
 // 그림 설명 asks in the same box as the memo and AI tab (question, send icon inside, model chip
 // under it) and shows the answer as the AI tab's card.
-function figureComposer(groups){return `<div class="note-ai-composer figure-composer"><textarea id="figure-question" rows="2" maxlength="2000" aria-label="${tr('그림에 질문')}" placeholder="${tr('이 그림에 질문하기 — 비우고 보내면 축·범례·주요 결과를 설명합니다')}"></textarea><div class="note-ai-composer-bar"><span></span><button type="button" class="composer-icon composer-send" data-action="figure-send" title="${tr('보내기 (Ctrl+Enter)')}" aria-label="${tr('설명 요청')}">${icon('composerSend')}</button></div></div><div class="note-ai-under figure-under">${modelField('figure-model',groups,preferredChoice(groups))}</div>`;}
+// A question box sends on Enter (Ctrl+Enter too) and breaks the line on Shift+Enter. An Enter that only ends the
+// composition of a Korean, Japanese or Chinese syllable (isComposing, key code 229) is the input method's, not a send.
+function aiSendKey(event){return event.key==='Enter'&&!event.shiftKey&&!event.altKey&&!event.isComposing&&event.keyCode!==229;}
+function figureComposer(groups){return `<div class="note-ai-composer figure-composer"><textarea id="figure-question" rows="2" maxlength="2000" aria-label="${tr('그림에 질문')}" placeholder="${tr('이 그림에 질문하기 — 비우고 보내면 축·범례·주요 결과를 설명합니다')}"></textarea><div class="note-ai-composer-bar"><span></span><button type="button" class="composer-icon composer-send" data-action="figure-send" title="${tr('보내기 (Enter · 줄바꿈은 Shift+Enter)')}" aria-label="${tr('설명 요청')}">${icon('composerSend')}</button></div></div><div class="note-ai-under figure-under">${modelField('figure-model',groups,preferredChoice(groups))}</div>`;}
 function figureAnswer(text,model,question){
   let body='';try{body=renderMarkdown(text);}catch(error){globalThis.quietError?.('figure-answer',error);}
   const asked=String(question||'').trim();
   return `<article class="insight-card open figure-answer"><header class="memo-card-head"><strong>${asked?tr('그림 질문'):tr('그림 설명',null,'kind')}</strong>${model?`<small class="muted">${esc(model)}</small>`:''}</header>${asked?`<blockquote class="small muted">${esc(asked)}</blockquote>`:''}<div class="insight-body md">${body||`<p>${esc(text)}</p>`}</div></article>`;
 }
-document.addEventListener('keydown',event=>{if(event.target.id==='figure-question'&&event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();actions['figure-send']?.();}});
+document.addEventListener('keydown',event=>{if(event.target.id==='figure-question'&&aiSendKey(event)){event.preventDefault();actions['figure-send']?.();}});
 async function openFigure(preset){
   const session={id:state.storageKey,paperId:state.selected,attachmentId:state.selectedAttachment,key:targetKey(),page:preset?.page||translationPages.get(targetKey())||1,revision:0};
   // The PDF is the one open on screen (no re-read of the file; the save checks it), loaded while the model list comes.

@@ -3,6 +3,7 @@
   "product": "BetaNote",
   "id": "betanote",
   "citekeyPrefix": "beta",
+  "store": { "name": "Newworker.BetaNote", "publisher": "CN=44D95639-80C5-44A1-917A-5BD8D9214D9F", "publisherDisplayName": "Newworker", "displayName": "BetaNote" },
   "history": [
     { "name": "Papi Note", "product": "Papi Note", "id": "papinote", "citekeyPrefix": "papi" },
     { "name": "knote", "product": "knote", "id": "knote", "citekeyPrefix": "knote" }

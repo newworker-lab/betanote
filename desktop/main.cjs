@@ -42,7 +42,8 @@ const insight = require('./insight.cjs');
 const { CorrectionStore } = require('./corrections.cjs');
 const { NotebookStore, notebookHtml, notesMarkdown } = require('./notebook.cjs');
 const { ThemeStore } = require('./themes.cjs');
-const { normalizeLanguage, initialLanguage, startupLanguage, patchLanguage, languageInfo, aiLanguage, translationLanguage, systemLanguagesFrom, keepLanguage } = require('./language.cjs');
+const { releaseFeed, latestRelease, due, noticeFor } = require('./update-check.cjs');
+const { normalizeLanguage, initialLanguage, languageAskAtStart, startupLanguage, patchLanguage, languageInfo, aiLanguage, translationLanguage, systemLanguagesFrom, keepLanguage } = require('./language.cjs');
 const { setUiLanguage, tr, trIn } = require('../core/i18n.js');
 const { LANGUAGES } = require('../core/languages.cjs');
 require('../core/i18n-en.js'); // the English the main process's own text is looked up in
@@ -145,6 +146,22 @@ function allowedSender(event,name){
   if (!allowed && process.env.APP_DEBUG_IPC) console.warn('refused', name);
   return allowed;
 }
+// Whether a newer release is out: asked of GitHub once a day at most, once the window is up. Not asked by the Microsoft
+// Store's package (the Store updates it), when switched off in the settings (features.updateCheck), or with
+// APP_UPDATE_FEED=off (the tests); another value of that variable is the address asked instead (a test's own server).
+// A check that got no answer is not counted, so the next start asks again.
+let pendingUpdate=null;
+async function checkForUpdate(){
+  const override=process.env.APP_UPDATE_FEED;
+  if(process.windowsStore||override==='off'||!features(config).updateCheck?.enabled||!due(config.updateCheckedAt,Date.now()))return;
+  const release=await latestRelease({fetch:(...args)=>net.fetch(...args),feed:override||releaseFeed(require('../package.json').repository?.url)});
+  if(!release)return;
+  config={...config,updateCheckedAt:Date.now()};await atomicJson(configFile,config);
+  pendingUpdate=noticeFor({current:app.getVersion(),release,skipped:config.updateSkipped});
+  if(pendingUpdate&&win&&!win.isDestroyed())win.webContents.send('update-available',pendingUpdate);
+}
+// The open vault's folder is not where it was (storage.cjs gone); a folder that cannot be looked at counts as there.
+const vaultGone=()=>Promise.resolve(library?.gone()).then(Boolean,()=>false);
 function register(name, fn, serial = true) {
   ipcMain.handle(name, (event, ...args) => {
     if (!allowedSender(event, name)) throw Error(tr('허용되지 않은 요청입니다.'));
@@ -152,9 +169,9 @@ function register(name, fn, serial = true) {
       // Node's own file errors name the call and the whole path; the window gets the reason and the code (the record keeps both).
       if(isRawFileError(error)){record('request',error,name);throw plainFileError(error);}
       // A save refused because the vault changed on disk: the page offers to read it again.
-      if(error?.code==='APP_EXTERNAL_CHANGE'&&win&&!win.isDestroyed())win.webContents.send('vault-changed-outside');else if(error?.name!=='AbortError')record('request',error,name);
+      if((error?.code==='APP_EXTERNAL_CHANGE'||error?.code==='APP_VAULT_GONE')&&win&&!win.isDestroyed())vaultGone().then(gone=>{if(win&&!win.isDestroyed())win.webContents.send('vault-changed-outside',{gone});});else if(error?.name!=='AbortError')record('request',error,name);
       // The window sees only the message, so a code travels in front of it as ⟦CODE⟧ (read by errorCode in renderer.js).
-      if(typeof error?.code==='string'&&/^APP_[A-Z_]+$/.test(error.code)&&error.code!=='APP_EXTERNAL_CHANGE'&&!error.message.startsWith('⟦'))error.message='⟦'+error.code+'⟧'+error.message;throw error;};
+      if(typeof error?.code==='string'&&/^APP_[A-Z_]+$/.test(error.code)&&error.code!=='APP_EXTERNAL_CHANGE'&&error.code!=='APP_VAULT_GONE'&&!error.message.startsWith('⟦'))error.message='⟦'+error.code+'⟧'+error.message;throw error;};
     if (!serial) return Promise.resolve().then(() => fn(...args)).catch(outside);
     const job = queue.then(() => fn(...args)).catch(outside); queue = job.catch(() => {}); return job;
   });
@@ -297,7 +314,7 @@ function reloadWindowsOnce(){return windowReload||=reloadWindows().finally(()=>{
 // not, so a change made outside just before it is never taken for seen.
 const vaultWatch=new VaultWatch({onProblem:record,onChange:root=>{if(library?.root===root&&closingVault!==library.data.id&&win&&!win.isDestroyed())win.webContents.send('vault-files-changed',library.data.id);}});
 function watchVault(target){const snapshot=target.snapshot.bind(target);target.snapshot=async(...args)=>{if(args[0]?.refresh===false||library!==target)return snapshot(...args);const seen=vaultWatch.reading(),result=await snapshot(...args);seen();return result;};vaultWatch.start(target.root);}
-async function closeVault(){vaultWatch.stop();figureController?.abort();insightController?.abort();if(releaseVault)closingVault=library?.data.id??null;await translations?.writes;await library?.ink?.idle();await library?.notebooks?.idle();if(!releaseVault)return;try{await library?.backup(tr('종료 시 백업'));}catch(error){console.error('종료 백업 실패:',error.message);}try{await releaseVault();}catch(error){console.error('저장소 잠금 해제 실패:',error.message);}finally{releaseVault=null;}} // i18n:keep — lines in the log, not on screen
+async function closeVault(){vaultWatch.stop();figureController?.abort();insightController?.abort();if(releaseVault)closingVault=library?.data.id??null;await translations?.writes;await library?.ink?.idle();await library?.notebooks?.idle();if(!releaseVault)return;try{if(!await vaultGone())await library?.backup(tr('종료 시 백업'));}catch(error){console.error('종료 백업 실패:',error.message);}try{await releaseVault();}catch(error){console.error('저장소 잠금 해제 실패:',error.message);}finally{releaseVault=null;}} // i18n:keep — lines in the log, not on screen
 async function connect(root) {
   root=await fs.realpath(root);
   if(library?.root===root){await library.assertUnchanged();return library.snapshot();}
@@ -354,9 +371,12 @@ if(singleInstance)app.whenReady().then(async () => {
   // in effect, which APP_UI_LANG may set for this run only (it is never written by itself).
   const systemLanguages = () => systemLanguagesFrom(process.env, () => app.getPreferredSystemLanguages());
   config = { ...config, language: Object.hasOwn(config, 'language') ? normalizeLanguage(config.language) : initialLanguage({ existingInstall, osLanguages: systemLanguages() }) };
+  // A new install is asked for its display language at the start screen (language.cjs languageAskAtStart): the key is
+  // in the settings until it is answered, and goes into the file with whatever setting is written next.
+  { const { languageAsk: _asked, ...rest } = config; config = languageAskAtStart({ existingInstall, stored: config.languageAsk, override: process.env.APP_UI_LANG }) ? { ...rest, languageAsk: true } : rest; }
   language = startupLanguage(config.language, process.env.APP_UI_LANG); setUiLanguage(language.ui);
   // Asked synchronously by the preload, so the page's scripts know the language before they run.
-  ipcMain.on('language-sync', event => { event.returnValue = allowedSender(event, 'language-sync') ? languageInfo(language, systemLanguages()) : null; });
+  ipcMain.on('language-sync', event => { event.returnValue = allowedSender(event, 'language-sync') ? languageInfo(language, systemLanguages(), config.languageAsk === true) : null; });
   // The OS secure storage, through its asynchronous calls (the synchronous ones are deprecated).
   // Whether it can be used is asked once: it does not change while the app runs. What the earlier
   // calls encrypted is read by decryptStringAsync as it is.
@@ -452,10 +472,15 @@ if(singleInstance)app.whenReady().then(async () => {
       // Saved first: only a change that reached the settings file is used, so a failed write changes nothing (the window
       // shows the error) and no request sees a language that was not kept. Other settings changed meanwhile stay.
       const stored = patchLanguage(config.language, patch);
+      // A display language chosen (even the one in effect) answers the first start's question: the key leaves the
+      // settings in the same write, and comes back if that write fails.
+      const asked = config.languageAsk === true && Object.hasOwn(patch, 'ui');
+      if (asked) { const { languageAsk: _asked, ...rest } = config; config = rest; }
       if (uiChanged) languageHolding++;
       try { await keepLanguage(stored, { get: () => config, set: value => { config = value; language = next; }, write: value => atomicJson(configFile, value), read: () => readJson(configFile, null), late: error => record('language-save', error) }); }
+      catch (error) { if (asked) config = { ...config, languageAsk: true }; throw error; }
       finally { if (uiChanged) languageHolding--; }
-      const info = languageInfo(language, systemLanguages());
+      const info = languageInfo(language, systemLanguages(), config.languageAsk === true);
       // The screen language reloads every window; the other settings reach every open window as they are.
       if (uiChanged) { setUiLanguage(language.ui); buildMenu(); reloadWindowsOnce().catch(error => record('language-reload', error)); }
       else for (const target of [win, ...notebookWindows, ...viewWindows]) if (target && !target.isDestroyed()) target.webContents.send('language-changed', info);
@@ -804,11 +829,13 @@ if(singleInstance)app.whenReady().then(async () => {
   // Each item's main PDF is renamed "Surname_Year_Title.pdf" in its folder
   // (through moveAttachment: backed up, copied, then swapped); a name in use
   // gets " (2)", " (3)" …
-  register('rename-attachments',async(id,paperIds)=>{
+  // style 'title': the title alone (서지정보's 제목으로 파일 이름); otherwise Surname_Year_Title.
+  register('rename-attachments',async(id,paperIds,style)=>{
+    if(style!==undefined&&style!=='title')throw Error(tr('파일 이름 방식을 확인하세요.'));
     const target=idleVault(id),out={renamed:0,unchanged:0,failed:[]};
     for(const paperId of paperIds){
       const paper=target.data.papers.find(p=>p.id===paperId),attachment=paper?.attachments.find(a=>a.id===paper.primaryAttachmentId&&!a.trashedAt)||paper?.attachments.find(a=>a.role!=='translated'&&!a.trashedAt);
-      const name=paper&&attachment&&fileNameFor(paper);if(!name){out.failed.push({paperId,error:tr('서지정보가 부족합니다.')});continue;}
+      const name=paper&&attachment&&fileNameFor(paper,style);if(!name){out.failed.push({paperId,error:style==='title'?tr('제목이 없습니다.'):tr('서지정보가 부족합니다.')});continue;}
       const folder=attachment.path.includes('/')?attachment.path.slice(0,attachment.path.lastIndexOf('/')):'';
       if(attachment.name===name){out.unchanged++;continue;}
       let result=tr('사용할 수 있는 이름이 없습니다.');
@@ -1035,7 +1062,7 @@ if(singleInstance)app.whenReady().then(async () => {
     noteWrites.set(id,entry);queue=entry.task.catch(()=>{});return entry.task;
   },false);
   // Whether library.json was changed by another program since this app read it (asked when the window comes back).
-  register('vault-check',async id=>({changed:!(await current(id).unchanged())}));
+  register('vault-check',async id=>({changed:!(await current(id).unchanged()),gone:await vaultGone()}));
   // Reads the vault again from disk without a restart. Notes the page had not saved yet are
   // merged in (mergePendingNotes), so neither the outside change nor the unsaved text is lost.
   register('vault-reload',async(id,pending)=>{
@@ -1048,6 +1075,28 @@ if(singleInstance)app.whenReady().then(async () => {
     const waiting=noteWrites.get(id);if(waiting)waiting.notes=next.data.notes;
     library=next;watchVault(next);return {...await next.snapshot(),reloaded:{kept:merged.kept.length,conflicts:merged.conflicts.length}};
   });
+  // The vault's folder was renamed or moved while it was open: the person picks where it is now. The folder is looked at
+  // before anything is made in it, and must hold this very vault. It is then connected like any vault (locked, opened,
+  // kept in the recent vaults, the old place let go), and the notes the page had not saved are merged in as on a reload.
+  register('vault-relocate',async(id,pending)=>{
+    const target=current(id);if(translating(id))throw Error(tr('번역 중에는 다시 연결할 수 없습니다. 번역이 끝나거나 중단한 뒤 다시 시도하세요.'));
+    const choice=await dialog.showOpenDialog(win,{title:tr('저장소 폴더 다시 고르기'),properties:['openDirectory']});if(choice.canceled||!choice.filePaths[0])return null;
+    const root=await fs.realpath(choice.filePaths[0]),found=await readJson(path.join(root,VAULT_DIR,'library.json'),null).catch(()=>null);
+    if(found?.id!==id)throw Error(tr('고른 폴더는 이 저장소의 폴더가 아닙니다. 이름을 바꾸거나 옮긴 그 폴더를 고르세요.'));
+    const before=target.data.notes,old=target.root;
+    await connect(root);
+    const merged=mergePendingNotes(before,library.data.notes,pending,aiLanguage(language));
+    if(merged.kept.length||merged.conflicts.length)await library.saveNotes(merged.notes);
+    const waiting=noteWrites.get(id);if(waiting)waiting.notes=library.data.notes;
+    if(old!==library.root&&config.recents.some(r=>r.root===old)){config={...config,recents:config.recents.filter(r=>r.root!==old)};await atomicJson(configFile,config);if(win)buildMenu();}
+    return {...await library.snapshot(),reloaded:{kept:merged.kept.length,conflicts:merged.conflicts.length}};
+  });
+  // The new-version notice (update-check.cjs; docs/DEVELOPMENT.md 새 버전 알림). The page asks for what was found
+  // (it may have loaded after the check) and is told when the check ends later. 내려받기 opens the release's page in
+  // the browser; the app installs nothing itself. A skipped version is kept and not offered again.
+  register('update-pending',()=>pendingUpdate,false);
+  register('update-open',async()=>{if(pendingUpdate)await shell.openExternal(pendingUpdate.url);},false);
+  register('update-skip',async()=>{if(!pendingUpdate)return;config={...config,updateSkipped:pendingUpdate.version};pendingUpdate=null;await atomicJson(configFile,config);});
   register('preferences', async values => {
     if (!Object.hasOwn(providers, values.provider) || !['web', 'api', 'local'].includes(values.mode)) throw Error(tr('지원하지 않는 번역 연결입니다.'));
     config.provider = values.provider; config.mode = values.mode; await atomicJson(configFile, config);
@@ -1063,6 +1112,7 @@ if(singleInstance)app.whenReady().then(async () => {
   register('pdf-open-link',async value=>{if(typeof value!=='string'||value.length>8192)throw Error(tr('PDF 링크를 확인하세요.'));const url=new URL(value);if(!['https:','http:','mailto:'].includes(url.protocol))throw Error(tr('지원하지 않는 PDF 링크입니다.'));await shell.openExternal(url.href);},false);
   register('reveal-original', async (id, paperId) => { shell.showItemInFolder(await current(id).resolveFile(paperId, 'original')); });
   await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  checkForUpdate().catch(error=>record('update-check',error));
   if(development){
     const marker=path.join(__dirname,'..','dist','.dev-reload.json');
     let timer,busy=false;

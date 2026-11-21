@@ -37,7 +37,7 @@
   const api={tr,trIn,setUiLanguage,uiLanguage,addMessages,messageKey,uiLocale};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   else{
-    root.appI18n=api;root.tr=tr;
+    root.appI18n=api;root.tr=tr;root.trIn=trIn;
     setUiLanguage(root.appApi?.language?.ui);
     // The page says which language it is in (screen readers, fonts, hyphenation).
     if(typeof document!=='undefined'&&document.documentElement)document.documentElement.lang=language;

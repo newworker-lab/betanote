@@ -8,7 +8,9 @@ const FEATURES = {
   // there for a later update. APP_SHOW_HIDDEN_FEATURES=1 shows hidden features (the tests use it).
   collections: { get label() { return tr('컬렉션'); }, tier: 'free', defaultOn: false, hidden: true },
   // A system notification when a translation ends while the window is in the background.
-  notifications: { get label() { return tr('번역 완료 알림'); }, tier: 'free', defaultOn: true }
+  notifications: { get label() { return tr('번역 완료 알림'); }, tier: 'free', defaultOn: true },
+  // Asking GitHub, once a day at most, whether a newer release is out (update-check.cjs).
+  updateCheck: { get label() { return tr('새 버전 확인'); }, tier: 'free', defaultOn: true }
 };
 
 function available(name, licence = null) {
