@@ -1,7 +1,8 @@
 // End-to-end check of the pane tool rows in a narrow pane (renderer.js toolRowLayout): the source pane's row and the
 // notebook's row never run past their pane; what does not fit is in the panel under ⋯ at the row's end, with its name;
 // PDF 저장 stays in the row; a tool in the panel works (the page number, a notebook tool) and a command closes the
-// panel; Escape closes it; in a wide pane everything is back in the row, in its order, and ⋯ is gone.
+// panel; Escape closes it; an open panel stays open when its row is drawn again (a translation ending redraws the
+// pane), and a closed one stays closed; in a wide pane everything is back in the row, in its order, and ⋯ is gone.
 // APP_TEST_SOURCE=1 runs the source; APP_PHOTO_DIR keeps pictures.
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
@@ -61,9 +62,24 @@ const root = path.resolve(__dirname, '..');
     // The page number in the panel goes to a page and leaves the panel open.
     const pageInput = sourcePanel.locator('input[type="number"], .pdf-page-input').first();
     if (await pageInput.count()) { await pageInput.fill('2'); await pageInput.press('Enter'); await p.waitForFunction(() => document.querySelector('.original-pages').scrollTop > 0); assert.equal(await sourcePanel.isVisible(), true, 'the panel stays open for the page number'); }
+    // The row drawn again while the panel is open (as the app does when a translation ends): the new row's panel is open,
+    // with the same tools. The row really is a new one, so this is the redraw and not a layout of the same row.
+    const redraw = () => p.evaluate(() => { document.querySelector('.source-tools').dataset.before = '1'; render(); return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+    const toolsUnder = () => p.evaluate(() => [...document.querySelectorAll('.source-tools>.tool-overflow>*')].map(n => n.dataset.action || n.className.split(' ')[0]));
+    const under = await toolsUnder(); await redraw();
+    assert.equal(await p.locator('.source-tools[data-before]').count(), 0, 'render draws the row again');
+    assert.equal(await sourcePanel.isVisible(), true, 'the panel stays open when its row is drawn again');
+    assert.equal(await sourceMore.getAttribute('aria-expanded'), 'true'); assert.deepEqual(await toolsUnder(), under, 'with the same tools');
+    await redraw(); assert.equal(await sourcePanel.isVisible(), true, 'and again');
     // Escape closes it and gives the focus back to ⋯; a press outside closes it too.
     await p.keyboard.press('Escape'); await sourcePanel.waitFor({ state: 'hidden' }); assert.equal(await p.evaluate(() => document.activeElement?.matches('.tool-more')), true, 'Escape gives the focus back to ⋯');
+    await redraw(); assert.equal(await sourcePanel.isVisible(), false, 'a panel closed with Escape stays closed when the row is drawn again');
     await sourceMore.click(); await sourcePanel.waitFor(); await p.locator('.pdf-pane-header').first().click(); await sourcePanel.waitFor({ state: 'hidden' });
+    await redraw(); assert.equal(await sourcePanel.isVisible(), false, 'nor does one closed by a press outside');
+    // Left open on a screen without that row: not opened again when the row comes back later.
+    await sourceMore.click(); await sourcePanel.waitFor(); await p.evaluate(() => { state.mode = 'translated'; render(); }); await p.waitForTimeout(200);
+    await p.evaluate(() => { state.mode = 'notebook'; render(); }); await p.locator('.source-tools>.tool-more').waitFor();
+    await p.waitForTimeout(200); assert.equal(await sourcePanel.isVisible(), false, 'a row that went away does not come back open');
     // A notebook tool under ⋯ works, and a command closes the panel (a menu that hangs from it keeps it).
     const nbRow = p.locator('.nb-tools'), nbMore = nbRow.locator(':scope>.tool-more'), nbPanel = nbRow.locator(':scope>.tool-overflow');
     await nbMore.click(); await nbPanel.waitFor(); await photo(p, 'tool-row-notebook.png');

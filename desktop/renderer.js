@@ -1644,8 +1644,19 @@ window.addEventListener('keydown',event=>{
 // after a command chosen in it.
 paths.toolMore='M12 5h.01 M12 12h.01 M12 19h.01'; // three dots upright; a page's own menu is three lying flat, the notebook's a gear
 const toolRows=new Map(),TOOL_ROWS='.pdf-pane-tools,.nb-tools,.notebook-pane>.pdf-pane-header',TOOL_ROW_KEPT='[data-action="gpt-export"],[data-action="ink-export-original"],.translation-quality,.pdf-pane-header>strong,.nb-select,.nb-status';
+// Which row's panel the person has open, by where the row is (the source or translation pane, the notebook's tools or
+// its header), not by the element: the app draws a row again when its tools change (a translation ending, a page
+// turning), and the new row's panel opens as the old one was. It is forgotten when the person closes the panel, and when
+// that row is no longer on the screen (another view), so a row that comes back later starts closed.
+let toolOpenKey=null;
+function toolRowKey(row){
+  const pane=row.closest('.translated-pane,.notebook-pane,.pdf-pane');
+  return (pane?.classList.contains('translated-pane')?'translated':pane?.classList.contains('notebook-pane')?'notebook':'source')+':'+(row.matches('.pdf-pane-header')?'header':'tools');
+}
 function toolRowLayout(row){
   const info=toolRows.get(row);if(!info||!row.isConnected)return;
+  // What has the focus in the row (the page number, the search box) is moved below and so loses it: it gets it back.
+  const focused=row.contains(document.activeElement)?document.activeElement:null;
   let more=row.querySelector(':scope>.tool-more'),panel=row.querySelector(':scope>.tool-overflow');
   if(!more){
     row.insertAdjacentHTML('beforeend',`<button type="button" class="pdf-tool tool-more" aria-haspopup="true" aria-expanded="false" title="${tr('도구 더 보기')}" aria-label="${tr('도구 더 보기')}" hidden>${icon('toolMore')}</button><div class="tool-overflow" role="group" aria-label="${tr('도구 더 보기')}" hidden></div>`);
@@ -1654,7 +1665,7 @@ function toolRowLayout(row){
   // Everything back in the row, each before the tool it stood before; then, while the row is too long, the last tool
   // that may go (saving the PDF and the translation's result count always stay in the row) goes to the head of the panel.
   for(const item of [...panel.children]){item.querySelector(':scope>.tool-overflow-label')?.remove();row.insertBefore(item,item.toolNext?.parentElement===row?item.toolNext:more);item.toolNext=null;}
-  const wasOpen=!panel.hidden; // a panel that is open stays open through a new layout, as long as it still holds something
+  const wasOpen=!panel.hidden||toolOpenKey===toolRowKey(row); // open stays open through a new layout or a new row, while it holds something
   row.append(more,panel);panel.hidden=true;more.hidden=true;more.setAttribute('aria-expanded','false');
   const justify=row.style.justifyContent;row.style.justifyContent='flex-start';
   const tooLong=()=>row.scrollWidth>row.clientWidth+1;
@@ -1668,6 +1679,7 @@ function toolRowLayout(row){
     if(!panel.children.length)more.hidden=true;else if(wasOpen){panel.hidden=false;more.setAttribute('aria-expanded','true');}
   }
   row.style.justifyContent=justify;info.changes.takeRecords();
+  if(focused?.isConnected&&document.activeElement!==focused&&!focused.closest('[hidden]'))focused.focus({preventScroll:true});
 }
 function toolRowsScan(){
   for(const [row,info] of toolRows)if(!row.isConnected){info.resize.disconnect();info.changes.disconnect();toolRows.delete(row);}
@@ -1676,12 +1688,13 @@ function toolRowsScan(){
     let width=-1;const info={resize:new ResizeObserver(([entry])=>{if(entry.contentRect.width!==width){width=entry.contentRect.width;toolRowLayout(row);}}),changes:new MutationObserver(()=>toolRowLayout(row))};
     toolRows.set(row,info);row.classList.add('tool-row');info.resize.observe(row);info.changes.observe(row,{childList:true});toolRowLayout(row);
   }
+  if(toolOpenKey&&![...toolRows.keys()].some(row=>toolRowKey(row)===toolOpenKey))toolOpenKey=null;
 }
 {let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;toolRowsScan();});}).observe(document.querySelector('#app'),{childList:true,subtree:true});toolRowsScan();}
-function toolPanelClose(except){document.querySelectorAll('.tool-overflow:not([hidden])').forEach(panel=>{if(panel===except)return;panel.hidden=true;panel.parentElement.querySelector(':scope>.tool-more')?.setAttribute('aria-expanded','false');});}
+function toolPanelClose(except){toolOpenKey=null;document.querySelectorAll('.tool-overflow:not([hidden])').forEach(panel=>{if(panel===except)return;panel.hidden=true;panel.parentElement.querySelector(':scope>.tool-more')?.setAttribute('aria-expanded','false');});}
 document.addEventListener('click',event=>{
   const more=event.target.closest?.('.tool-more');
-  if(more){const panel=more.parentElement.querySelector(':scope>.tool-overflow'),open=panel.hidden;toolPanelClose();panel.hidden=!open;more.setAttribute('aria-expanded',String(open));return;}
+  if(more){const panel=more.parentElement.querySelector(':scope>.tool-overflow'),open=panel.hidden;toolPanelClose();panel.hidden=!open;more.setAttribute('aria-expanded',String(open));if(open)toolOpenKey=toolRowKey(more.parentElement);return;}
   if(!event.target.closest?.('.tool-overflow')){toolPanelClose();return;}
   // A command chosen in the panel closes it, unless it opened a menu that hangs from it; the page number, the search
   // box and the zoom steps (no data-action) are used again and again and leave it open.
