@@ -100,7 +100,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('#insight-question').fill('reading speed'); await p.locator('[data-insight-ask] button').click(); await p.locator('#dialog [data-action="ai-send"]').click();
     await p.locator('.insight-card').filter({ hasText: '12% 빨라졌습니다' }).waitFor();
     assert.ok((await app.evaluate(() => globalThis.requests.at(-1))).evidence.every(b => /reading speed/i.test(b.text)));
-    // The AI tab: question box first, then 구조화 요약 · ⓘ (the note about results shows on hover and stays on click).
+    // The AI tab: question box first, then AI 요약 · ⓘ (the note about results shows on hover and stays on click).
     assert.deepEqual(await p.locator('.insight-panel > form, .insight-panel > .insight-actions').evaluateAll(n => n.map(x => x.classList[0])), ['insight-ask', 'insight-actions']);
     assert.deepEqual(await p.locator('.insight-actions > *').evaluateAll(n => n.map(x => x.dataset.action || x.className)), ['ai-summary', 'insight-info']);
     assert.equal(await p.locator('.insight-panel > p.small.muted').count(), 0, 'the note is behind ⓘ, not a paragraph');
@@ -122,7 +122,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('[data-insight-fold]').click(); assert.equal(await p.locator('.insight-card.open').count(), 0);
     await p.locator('.insight-card').first().click(); await p.locator('.insight-card.open').waitFor(); await p.locator('.insight-card.open').focus(); await p.keyboard.press('Escape'); assert.equal(await p.locator('.insight-card.open').count(), 0);
     // ⤢ reads a result large in a window of its own.
-    await p.locator('.insight-card').filter({ hasText: '구조화 요약' }).locator('[data-insight-wide]').click();
+    await p.locator('.insight-card').filter({ hasText: 'AI 요약' }).locator('[data-insight-wide]').click();
     await p.locator('#dialog.insight-wide-dialog .insight-wide').filter({ hasText: '전체 3쪽' }).waitFor(); assert.ok((await p.locator('#dialog').boundingBox()).width > 600);
     await p.locator('#dialog [data-action="close"]').first().click(); await p.waitForFunction(() => !document.querySelector('#dialog').open && !document.querySelector('#dialog').classList.contains('insight-wide-dialog'));
 

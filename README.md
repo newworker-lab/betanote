@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.1" src="https://img.shields.io/badge/version-1.1.1-1b64da">
+  <img alt="버전 1.1.2" src="https://img.shields.io/badge/version-1.1.2-1b64da">
   <img alt="Windows · Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">
@@ -40,7 +40,7 @@
 |---|---|
 | 📄 **배치를 유지한 번역** | 문단 위치, 단 구성, 그림, 수식을 그대로 두고 번역만 바꿉니다. 원문 · 번역 · 동시보기를 오가며 읽고, 번역본을 PDF로 저장합니다. |
 | 🤖 **쓰던 AI를 그대로** | ChatGPT 계정, OpenAI · Claude · Gemini API 키, 내 PC의 로컬 모델(Ollama 등) 중에서 고릅니다. |
-| 💬 **논문에게 묻기** | 구조화 요약, 고른 문장 설명, 그림 설명, 질문과 답. 답에는 근거가 된 본문 위치가 붙습니다. |
+| 💬 **논문에게 묻기** | AI 요약, 고른 문장 설명, 그림 설명, 질문과 답. 답에는 근거가 된 본문 위치가 붙습니다. |
 | ✍️ **필기와 메모** | 펜 · 형광펜 · 도형 · 텍스트 상자로 원문과 번역 위에 쓰고, 메모와 노트북에 정리합니다. |
 | 📚 **서재 관리** | 서지정보, DOI 조회, 태그, 폴더, 중복 정리, 본문 검색, 인용 복사(APA · Vancouver), RIS · BibTeX 가져오기와 내보내기. |
 | 🔒 **내 PC에 저장** | 자료는 내가 고른 폴더에 그대로 있습니다. 계정 가입이 없고, 논문을 보내는 곳은 내가 연결한 AI뿐입니다. |
@@ -135,7 +135,7 @@
 <summary><b>AI에게 묻기</b></summary>
 <br>
 
-- **구조화 요약**: 연구 질문 · 방법 · 결과 · 한계로 나눠 요약합니다.
+- **AI 요약**: 연구 질문 · 방법 · 결과 · 한계로 나눠 요약합니다.
 - **질문**: 논문에 대해 물으면 근거가 된 본문 위치와 함께 답합니다. 근거가 없으면 없다고 표시합니다.
 - **선택 설명**: 문장이나 수식을 끌어 고른 뒤 설명을 요청합니다.
 - **그림 설명**: 도구 줄의 `그림 설명`을 누르고 그림 영역을 고릅니다.

@@ -10,7 +10,7 @@ test('Korean labels are the text the app has always written', () => {
   assert.equal(memoLabel('explainHead', 'ko', { file, page, model }), `AI 설명 · ${file} · ${page}페이지 · ${model}`);
   assert.equal(memoLabel('explainTitle', 'ko', { page }), `AI 설명 · ${page}쪽`);
   assert.equal(memoLabel('figureHead', 'ko', { file, page, model }), `그림 설명 · ${file} · ${page}페이지 · ${model}`);
-  for (const [kind, word] of [['summary', '구조화 요약'], ['explain', '선택 설명'], ['ask', '질문']]) assert.equal(memoLabel('resultHead', 'ko', { kind, model, date }), `AI ${word} · ${model} · ${date}`);
+  for (const [kind, word] of [['summary', '요약'], ['explain', '선택 설명'], ['ask', '질문']]) assert.equal(memoLabel('resultHead', 'ko', { kind, model, date }), `AI ${word} · ${model} · ${date}`);
   assert.equal(memoLabel('compareHead', 'ko', { model, others: 'A, B' }), `AI 비교 · ${model} · 함께 비교: A, B`);
   assert.equal(memoLabel('contribution', 'ko'), ' 기여');
   assert.equal(memoLabel('translationLine', 'ko'), '번역: ');
@@ -64,7 +64,9 @@ test('a line the reader wrote is not taken for a head', () => {
 test('Korean heads written before, as the app reads them now', () => {
   assert.deepEqual(readMemoHead('[그림 설명 · paper.pdf · 3페이지 · gpt]'), { kind: 'figure', language: 'ko', label: '그림 설명', detail: 'paper.pdf · 3페이지 · gpt', page: 3 });
   assert.equal(readMemoHead('[AI 설명 · a.pdf · 4페이지 · m]').page, 4);
+  // Heads written before 1.1.2 named the summary 구조화 요약: they are still AI heads.
   assert.ok(isAiHead('[AI 구조화 요약 · m · 2026. 11. 13.] 기여'));
+  assert.ok(isAiHead('[AI 요약 · m · 2026. 11. 23.]'));
   assert.ok(isAutoTitle('그림 설명 · 3 쪽'));
   assert.ok(isAutoTitle('AI 선택 설명 · 12쪽'));
   assert.ok(isAutoTitle('주석 · 2쪽'));
@@ -135,7 +137,7 @@ test('an older figure memo head is read as the earlier rule read it (readFigureM
 });
 test('a stored language the app does not know is read as Korean', () => {
   for (const language of ['__proto__', 'toString', 'constructor', 'xx', '', null, undefined, 42]) {
-    assert.equal(memoLabel('resultHead', language, { kind: 'summary', model: 'm', date: 'd' }), 'AI 구조화 요약 · m · d', String(language));
+    assert.equal(memoLabel('resultHead', language, { kind: 'summary', model: 'm', date: 'd' }), 'AI 요약 · m · d', String(language));
     assert.equal(memoDate(Date.UTC(2026, 10, 13, 12), language), memoDate(Date.UTC(2026, 10, 13, 12), 'ko'), String(language));
   }
 });

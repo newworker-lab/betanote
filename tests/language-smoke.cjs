@@ -610,14 +610,14 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
       assert.equal(await app.evaluate(() => globalThis.aiCalls), calls, 'the model was not asked');
       await fs.rm(aiFile); await openSummary();
       noKorean(await shown('.insight-panel, .insight-results-panel'), 'AI panel, no results');
-      // A structured summary: the dialog, then its card closed and open (sources, a model's reading, one without a source).
+      // An AI summary: the dialog, then its card closed and open (sources, a model's reading, one without a source).
       await p.locator('[data-action="ai-summary"]').click(); await p.locator('#dialog[open] [data-action="ai-send"]').waitFor();
       noKorean(await dialogShown(), 'summary dialog');
       await p.locator('#dialog[open] [data-action="ai-send"]').click(); await p.locator('.insight-card').waitFor();
       noKorean(await shown('.insight-results-panel'), 'AI records, a summary');
       await p.locator('.insight-card').first().click(); await p.locator('.insight-card.open').waitFor();
       const card = await shown('.insight-results-panel'); noKorean(card, 'AI records, the summary open');
-      assert.match(card, /Structured summary/); assert.match(card, /Model's interpretation/); assert.match(card, /Insufficient evidence/);
+      assert.match(card, /AI summary/); assert.match(card, /Model's interpretation/); assert.match(card, /Insufficient evidence/);
       // A question about the item.
       await p.locator('#insight-question').fill('What does it connect?'); await p.locator('[data-insight-ask] button').click(); await p.locator('#dialog[open] [data-action="ai-send"]').waitFor();
       noKorean(await dialogShown(), 'question dialog');
@@ -631,13 +631,13 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
       const asked = (await results()).find(r => r.kind === 'summary'); assert.equal(asked.language, 'en', 'asked before the change');
       await p.evaluate(id => adoptInsight(id), asked.id);
       const adopted = () => p.evaluate(() => notes[`${state.selected}-summary-0`] || '');
-      assert.match(await adopted(), /^\[AI structured summary · fixture-model · [A-Z][a-z]{2} \d{1,2}, \d{4}\]\n/, 'an English result keeps an English head after the change');
+      assert.match(await adopted(), /^\[AI summary · fixture-model · [A-Z][a-z]{2} \d{1,2}, \d{4}\]\n/, 'an English result keeps an English head after the change');
       const before = (await results()).length;
       await p.locator('[data-action="ai-summary"]').click(); await p.locator('#dialog[open] [data-action="ai-send"]').click();
       await p.waitForFunction(n => insightState.results.get(targetKey()).length > n, before);
       const japanese = (await results()).find(r => r.kind === 'summary'); assert.equal(japanese.language, 'ja');
       await p.evaluate(id => adoptInsight(id), japanese.id);
-      assert.match(await adopted(), /\n\n\[AI 構造化要約 · fixture-model · \d{4}\/\d{1,2}\/\d{1,2}\]\n/, 'a Japanese result gets a Japanese head');
+      assert.match(await adopted(), /\n\n\[AI 要約 · fixture-model · \d{4}\/\d{1,2}\/\d{1,2}\]\n/, 'a Japanese result gets a Japanese head');
       // A result saved before results recorded a language is Korean.
       assert.deepEqual(await p.evaluate(() => [{ translation: 't', sections: { explanation: [{ text: 'x', basis: 'model', evidence: [] }] } }, { language: 'ja', translation: 't', sections: { explanation: [{ text: 'x', basis: 'model', evidence: [] }] } }].map(explainMarkdown)),
         ['**번역** t\n\n- (모델 해석) x', '**訳文** t\n\n- (モデルの解釈) x']);
