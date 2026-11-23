@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.0" src="https://img.shields.io/badge/version-1.1.0-1b64da">
+  <img alt="버전 1.1.1" src="https://img.shields.io/badge/version-1.1.1-1b64da">
   <img alt="Windows · Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">
@@ -155,6 +155,8 @@
 
 - 같은 도구를 한 번 더 누르면 종류를 바꿉니다(예: 도형 → 직선 · 화살표 · 사각형 · 삼각형).
 - 올가미로 필기를 둘러 고르면 옮기기 · 크기 조절 · 색 바꾸기 · 복제가 됩니다.
+- 선택 도구로 펜 선 · 도형 · 텍스트 상자를 바로 끌어 옮깁니다. 형광펜은 올가미로 고른 뒤 옮깁니다.
+- 끌어서 다른 쪽 위에 놓으면 그 쪽으로 옮겨집니다(쪽 밖으로 나가지 않습니다).
 - 문장을 끌어 고르면 형광펜 · 밑줄 · 주석을 바로 붙일 수 있습니다.
 - 필기는 원문과 번역에 각각 따로 저장됩니다.
 - PDF로 저장하면 필기가 다른 PDF 프로그램에서도 보이는 표준 주석으로 들어갑니다.

@@ -157,3 +157,7 @@ body.ink-over-text .translated-pages .page{cursor:text}
 .ink-text-bar select.ink-tb-size{width:56px;text-align:left;cursor:pointer}
 /* A text box under the pointer (reading and text tools): the move cursor, as on notebook boxes. */
 body.ink-text-hover .translated-pages .page,body.ink-text-hover .translated-pages .page *{cursor:move!important}
+/* With the select tool, over a pen stroke or shape it can move (desktop/ink.js inkGrabHit). */
+body:not(.ink-active).ink-stroke-hover .translated-pages .page,body:not(.ink-active).ink-stroke-hover .translated-pages .page *{cursor:grab!important}
+body.ink-grabbing .translated-pages .page,body.ink-grabbing .translated-pages .page *{cursor:grabbing!important}
+body:not(.ink-active):not(.ink-grabbing) .nb-page.ink-over-stroke{cursor:grab}

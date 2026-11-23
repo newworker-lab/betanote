@@ -1,6 +1,7 @@
 // End-to-end check of letting go with Esc and the select tool in the real app: a lasso selection (on a PDF page and in a
-// notebook) goes with Esc, also when the keyboard is still in a text field, and when the reading (select) tool is
-// chosen; Esc leaves full screen (F11) once nothing on the page has used it, so one press does one thing.
+// notebook) goes with Esc, also when the keyboard is still in a text field; the select tool and the hand keep it (both
+// move it) and a press on the page with the select tool lets go of it; Esc leaves full screen (F11) once nothing on the
+// page has used it, so one press does one thing.
 // APP_TEST_SOURCE=1 runs the source.
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
@@ -37,19 +38,19 @@ const root = path.resolve(__dirname, '..');
     const lasso = async (point, box) => { await p.locator('[data-ink-tool="lasso"]').click(); await p.mouse.move(...point(box[0], box[1])); await p.mouse.down(); for (const pt of [[box[2], box[1]], [box[2], box[3]], [box[0], box[3]], [box[0], box[1] + .01]]) await p.mouse.move(...point(...pt), { steps: 4 }); await p.mouse.up(); };
 
     // ---- PDF page. Esc lets go of the selection, also with the keyboard still in the search field; the select tool
-    // lets go of it too, while the hand keeps it to move.
+    // keeps it (it moves it by its strokes) until a press on the page away from the ink, and the hand keeps it to move.
     await lasso(at, [.25, .45, .55, .6]); await p.locator('.ink-selection').waitFor(); assert.deepEqual(await selected(), [true, 1]);
     await p.locator('#search').evaluate(n => n.focus()); await p.keyboard.press('Escape'); assert.deepEqual(await selected(), [false, 0], 'Esc lets go (focus in a text field)');
     await lasso(at, [.25, .45, .55, .6]); await p.locator('.ink-selection').waitFor();
-    await p.locator('[data-ink-tool="read"]').click(); assert.deepEqual(await selected(), [false, 0], 'the select tool lets go');
+    await p.locator('[data-ink-tool="read"]').click(); assert.deepEqual(await selected(), [true, 1], 'the select tool keeps it');
     assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'read');
-    // The hand, reached through the reading button's menu, takes back the selection reading let go of, to move it; a
-    // press on the page in between forgets it.
+    await p.mouse.click(...at(.85, .3)); assert.deepEqual(await selected(), [false, 0], 'a press on the page away from the ink lets go');
+    // The hand, reached through the select button's menu, keeps the selection to move it; so does the select tool again.
     const pickPointer = async value => { await p.locator('[data-ink-group="pointer"]').click(); if (!await p.locator('[data-ink-flyout="pointer"]').count()) await p.locator('[data-ink-group="pointer"]').click(); await p.locator(`[data-ink-pick="pointer"][data-value="${value}"]`).click(); };
-    await lasso(at, [.25, .45, .55, .6]); await p.locator('.ink-selection').waitFor(); await p.locator('[data-ink-tool="read"]').click(); assert.deepEqual(await selected(), [false, 0]);
-    await pickPointer('hand'); assert.deepEqual(await selected(), [true, 1], 'the hand takes the selection back');
-    await pickPointer('read'); assert.deepEqual(await selected(), [false, 0]); await p.mouse.click(...at(.8, .9)); await pickPointer('hand'); assert.deepEqual(await selected(), [false, 0], 'not after a press on the page');
-    await pickPointer('read');
+    await lasso(at, [.25, .45, .55, .6]); await p.locator('.ink-selection').waitFor();
+    await pickPointer('hand'); assert.deepEqual(await selected(), [true, 1], 'the hand keeps the selection');
+    await pickPointer('read'); assert.deepEqual(await selected(), [true, 1], 'and the select tool');
+    await p.keyboard.press('Escape'); assert.deepEqual(await selected(), [false, 0]);
 
     // ---- Full screen. One Esc does one thing: first it lets go of the selection, the next leaves full screen.
     await fullScreen(true); assert.equal(await waitFull(true), true, 'the window went full screen');
@@ -71,8 +72,9 @@ const root = path.resolve(__dirname, '..');
     await lasso(on, [.25, .15, .55, .3]); await p.locator('.nb-selection').waitFor(); assert.deepEqual(await nbSelected(), [true, 1]);
     await p.locator('#search').evaluate(n => n.focus()); await p.keyboard.press('Escape'); assert.deepEqual(await nbSelected(), [false, 0], 'Esc lets go in a notebook');
     await lasso(on, [.25, .15, .55, .3]); await p.locator('.nb-selection').waitFor();
-    await p.locator('[data-ink-tool="read"]').click(); assert.deepEqual(await nbSelected(), [false, 0], 'the select tool lets go in a notebook');
-    console.log('Escape smoke passed: Esc and the select tool let go of a lasso selection on PDF pages and in notebooks; Esc leaves full screen once nothing else used it.');
+    await p.locator('[data-ink-tool="read"]').click(); assert.deepEqual(await nbSelected(), [true, 1], 'the select tool keeps it in a notebook');
+    await p.mouse.click(...on(.8, .8)); assert.deepEqual(await nbSelected(), [false, 0], 'a press on nothing lets go in a notebook');
+    console.log('Escape smoke passed: Esc lets go of a lasso selection on PDF pages and in notebooks, the select tool keeps it until a press on the page; Esc leaves full screen once nothing else used it.');
   } catch (error) { console.error(error); process.exitCode = 1; }
   finally { await app?.close().catch(() => {}); await fs.rm(temp, { recursive: true, force: true }); }
 })();

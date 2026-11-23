@@ -1,7 +1,7 @@
 {
   "name": "betanote",
   "productName": "BetaNote",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "repository": {
@@ -28,7 +28,7 @@
     "pretest:textbox": "npm run build",
     "test:textbox": "node tests/textbox-smoke.cjs",
     "pretest:ink": "npm run build",
-    "test:ink": "node tests/ink-smoke.cjs && node tests/ink-tools-smoke.cjs && node tests/ink-color-smoke.cjs && node tests/ink-recovery-smoke.cjs",
+    "test:ink": "node tests/ink-smoke.cjs && node tests/ink-tools-smoke.cjs && node tests/ink-color-smoke.cjs && node tests/lasso-move-smoke.cjs && node tests/ink-select-smoke.cjs && node tests/ink-recovery-smoke.cjs",
     "pretest:library": "npm run build",
     "test:library": "node tests/library-smoke.cjs",
     "test:search": "node tests/search-smoke.cjs",

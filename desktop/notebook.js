@@ -199,27 +199,40 @@ let nbPointer=null,nbLastPress={},nbFocus=null;
 function nbMarkFocus(){document.querySelectorAll('.nb-item.nb-focused').forEach(n=>n.classList.remove('nb-focused'));if(nbFocus)document.querySelector(`.nb-item[data-item-id="${CSS.escape(nbFocus)}"]`)?.classList.add('nb-focused');}
 // Delete (or Backspace) removes the box pressed last, unless a text is being typed or a lasso selection is up.
 function nbRemoveItem(id){if(!nb.doc||!id)return;nbChange('삭제',()=>{for(const page of nb.doc.pages)page.items=page.items.filter(i=>i.id!==id);});if(nbFocus===id)nbFocus=null;nbRender();} // i18n:keep — the undo label (not shown)
-document.addEventListener('keydown',event=>{if(!['Delete','Backspace'].includes(event.key)||!nbFocus||nb.sel||dialog.open||event.target.closest?.('input,textarea,select,[contenteditable="true"],.cm-editor'))return;if(!document.querySelector(`.nb-item[data-item-id="${CSS.escape(nbFocus)}"]`)){nbFocus=null;return;}event.preventDefault();nbRemoveItem(nbFocus);});
+document.addEventListener('keydown',event=>{if(!['Delete','Backspace'].includes(event.key)||event.defaultPrevented||!nbFocus||nb.sel||dialog.open||event.target.closest?.('input,textarea,select,[contenteditable="true"],.cm-editor'))return;if(!document.querySelector(`.nb-item[data-item-id="${CSS.escape(nbFocus)}"]`)){nbFocus=null;return;}event.preventDefault();nbRemoveItem(nbFocus);});
 document.addEventListener('pointerdown',event=>{if(nbFocus&&!event.target.closest?.('.nb-item')){nbFocus=null;nbMarkFocus();}},true);
+// A box pressed (to move, resize or delete it) is the one thing chosen: a selection here or on a PDF page is let go.
+function nbFocusBox(id){nbFocus=id;if(nb.sel)nbSelect(null);globalThis.appInk.clearSelection();nbMarkFocus();}
+// A selection or text box chosen on a PDF page lets go of the notebook's (desktop/ink.js inkSelectOnly).
+globalThis.appInk.onSelect=()=>{if(nb.sel)nbSelect(null);if(nbFocus){nbFocus=null;nbMarkFocus();}};
 function nbPoint(el,event){const r=el.getBoundingClientRect(),{w,h}=nbSize(el);return [(event.clientX-r.left)/r.width*w,(event.clientY-r.top)/r.height*h];}
 function nbBindPage(el){
   el.addEventListener('pointerdown',event=>{
     const ink=globalThis.appInk,tool=event.buttons&32?'eraser':ink.tool;
     // A box's grip and corner move and resize it with any tool, also while its text is being edited.
     const boxGrip=event.button===0&&event.target.closest('.nb-item [data-nb-resize]');
-    if(boxGrip){const item=boxGrip.closest('.nb-item');event.preventDefault();event.stopPropagation();nbFocus=item.dataset.itemId;el.setPointerCapture(event.pointerId);nbPointer={kind:'resize',el,id:item.dataset.itemId,start:nbPoint(el,event),node:item,pointerId:event.pointerId};return;}
+    if(boxGrip){const item=boxGrip.closest('.nb-item');event.preventDefault();event.stopPropagation();nbFocusBox(item.dataset.itemId);el.setPointerCapture(event.pointerId);nbPointer={kind:'resize',el,id:item.dataset.itemId,start:nbPoint(el,event),node:item,pointerId:event.pointerId};return;}
     if(event.target.closest('textarea,button,input,.note-box,.nb-memo-read'))return;
     if(event.pointerType==='touch'&&!ink.penLike(event)&&nbPointer)return;
     const at=nbPoint(el,event),sel=nb.sel?.pageId===el.dataset.pageId?nb.sel:null,touchPans=ink.fingerPans(event);
     // A lasso selection: its corner scales it, the hand moves it from
     // anywhere on its page and the lasso from inside it.
     const grip=sel&&event.button===0&&(event.target.closest('.ink-handle')?'scale':!touchPans&&(tool==='hand'||tool==='lasso'&&nbInBox(sel.box,at))?'shift':null);
-    if(grip){event.preventDefault();el.setPointerCapture(event.pointerId);document.body.classList.add('ink-grabbing');nbPointer={kind:grip,el,start:at,last:at,pointerId:event.pointerId};return;}
-    // Reading tool: drag a box (or its corner) to move or resize it.
-    if(tool==='read'){const item=event.target.closest('.nb-item');if(!item||event.button!==0)return;nbFocus=item.dataset.itemId;nbMarkFocus();
+    if(grip){event.preventDefault();el.setPointerCapture(event.pointerId);document.body.classList.add('ink-grabbing');nbPointer={kind:grip,el,start:at,last:at,client:[event.clientX,event.clientY],pointerId:event.pointerId};return;}
+    // Select tool: a press on a pen stroke or shape (boxes come first) selects it, or keeps the selection it is in, and
+    // the same press drags it, as on PDF pages; a press on nothing lets go of the selection.
+    if(tool==='read'&&!event.target.closest('.nb-item')){
+      if(event.button!==0||touchPans)return;const stroke=nbStrokeAt(el,nbPage(el.dataset.pageId),at);
+      if(!stroke){if(nb.sel)nbSelect(null);return;}
+      event.preventDefault();if(!sel?.strokes.includes(stroke.id))nbSelect({pageId:el.dataset.pageId,strokes:[stroke.id],items:[]});
+      // A tap selects: nothing moves until the pointer has gone a few pixels.
+      el.setPointerCapture(event.pointerId);document.body.classList.add('ink-grabbing');nbPointer={kind:'shift',el,start:at,last:at,client:[event.clientX,event.clientY],slop:4/nbScale(el),pointerId:event.pointerId};return;
+    }
+    // Select tool: drag a box (or its corner) to move or resize it.
+    if(tool==='read'){const item=event.target.closest('.nb-item');if(!item||event.button!==0)return;nbFocusBox(item.dataset.itemId);
       // A second press on the same text box soon after the first edits it (the drag's pointer capture hides
       // the dblclick event, and a pointer event's detail does not count clicks).
-      if(item.classList.contains('nb-text')){const now=performance.now(),again=nbLastPress.id===item.dataset.itemId&&now-nbLastPress.at<450;nbLastPress={id:item.dataset.itemId,at:now};if(again){event.preventDefault();nbLastPress={};nbEditText(item);return;}}event.preventDefault();el.setPointerCapture(event.pointerId);nbPointer={kind:event.target.closest('[data-nb-resize]')?'resize':'move',el,id:item.dataset.itemId,start:nbPoint(el,event),node:item,pointerId:event.pointerId};return;}
+      if(item.classList.contains('nb-text')){const now=performance.now(),again=nbLastPress.id===item.dataset.itemId&&now-nbLastPress.at<450;nbLastPress={id:item.dataset.itemId,at:now};if(again){event.preventDefault();nbLastPress={};nbEditText(item);return;}}event.preventDefault();el.setPointerCapture(event.pointerId);nbPointer={kind:event.target.closest('[data-nb-resize]')?'resize':'move',el,id:item.dataset.itemId,start:nbPoint(el,event),client:[event.clientX,event.clientY],node:item,pointerId:event.pointerId};return;}
     // A finger moves the pages unless touch writing is on; so does the hand.
     if(touchPans||tool==='hand'){const list=el.closest('.nb-pages');let y=event.clientY,x=event.clientX;el.setPointerCapture(event.pointerId);const move=e=>{if(e.pointerId!==event.pointerId)return;list.scrollBy(x-e.clientX,y-e.clientY);x=e.clientX;y=e.clientY;},up=e=>{if(e.pointerId!==event.pointerId)return;el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);};el.addEventListener('pointermove',move);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);return;}
     if(event.button!==0&&!(event.buttons&32))return;
@@ -241,12 +254,14 @@ function nbBindPage(el){
 }
 function nbMove(event){
   const p=nbPointer;if(!p)return;const page=nbPage(p.el.dataset.pageId);if(!page)return;
-  if(p.kind==='move'||p.kind==='resize'){const [x,y]=nbPoint(p.el,event),item=page.items.find(i=>i.id===p.id);if(!item)return;p.dx=x-p.start[0];p.dy=y-p.start[1];
-    const nx=p.kind==='move'?item.x+p.dx:item.x,ny=p.kind==='move'?item.y+p.dy:item.y,nw=p.kind==='resize'?Math.max(20,item.w+p.dx):item.w,nh=p.kind==='resize'?Math.max(16,item.h+p.dy):item.h;
+  if(p.kind==='move'){const [x,y]=nbPoint(p.el,event),item=page.items.find(i=>i.id===p.id);if(!item)return;p.dx=x-p.start[0];p.dy=y-p.start[1];p.client=[event.clientX,event.clientY];
+    p.plan=nbDrop(p.el,nbItemBox(item),[p.dx,p.dy],p.client);nbPlaceNode(p.node,item,p.plan);return;}
+  if(p.kind==='resize'){const [x,y]=nbPoint(p.el,event),item=page.items.find(i=>i.id===p.id);if(!item)return;p.dx=x-p.start[0];p.dy=y-p.start[1];
+    const nx=item.x,ny=item.y,nw=Math.max(20,item.w+p.dx),nh=Math.max(16,item.h+p.dy);
     Object.assign(p.node.style,{left:pct(nx,page.width),top:pct(ny,page.height)},p.node.matches('.nb-memo-card:not(.open)')?{width:pct(nw,page.width)}:{width:pct(nw,page.width),height:pct(nh,page.height)});return;}
   if(p.kind==='shape'){p.last=nbPoint(p.el,event);p.shift=event.shiftKey;nbLive(p).request();return;}
   if(p.kind==='lasso'){p.path.push(nbPoint(p.el,event));nbLive(p).request();return;}
-  if(p.kind==='shift'||p.kind==='scale'){p.last=nbPoint(p.el,event);if(!p.frame)p.frame=requestAnimationFrame(()=>{p.frame=null;nbSelectionPreview(p,page);});return;}
+  if(p.kind==='shift'||p.kind==='scale'){p.last=nbPoint(p.el,event);p.client=[event.clientX,event.clientY];if(p.slop&&!p.moved){if(Math.hypot(p.last[0]-p.start[0],p.last[1]-p.start[1])<p.slop)return;p.moved=true;}if(!p.frame)p.frame=requestAnimationFrame(()=>{p.frame=null;nbSelectionPreview(p,page);});return;}
   for(const e of event.getCoalescedEvents?.().length?event.getCoalescedEvents():[event]){
     const [x,y]=nbPoint(p.el,e);
     // Shift draws pen and highlighter like a ruler, as on PDF pages.
@@ -278,7 +293,11 @@ function nbEnd(){
   const p=nbPointer;nbPointer=null;if(!p)return;const pageId=p.el.dataset.pageId;
   // Whatever the gesture, its preview ends with it.
   p.live?.end();if(p.frame)cancelAnimationFrame(p.frame);
-  if(p.kind==='move'||p.kind==='resize'){if(!p.dx&&!p.dy){if(p.kind==='move'&&p.node?.matches('.nb-memo-card:not(.open)'))nbMemoOpen(p.id);return;}nbChange(p.kind==='move'?'이동':'크기',()=>{const item=nbPage(pageId).items.find(i=>i.id===p.id);if(p.kind==='move'){item.x=Math.round(item.x+p.dx);item.y=Math.round(item.y+p.dy);}else{item.w=Math.round(Math.max(20,item.w+p.dx));item.h=Math.round(Math.max(16,item.h+p.dy));}});nbSelectionDraw();return;} // i18n:keep — the undo label (not shown)
+  if(p.kind==='move'||p.kind==='resize'){if(!p.dx&&!p.dy){if(p.kind==='move'&&p.node?.matches('.nb-memo-card:not(.open)'))nbMemoOpen(p.id);return;}
+    // A box moved onto another page becomes that page's (one undo step for both pages).
+    const plan=p.kind==='move'?p.plan:null,onto=plan&&plan.el!==p.el;
+    nbChange(p.kind==='move'?'이동':'크기',()=>{const from=nbPage(pageId),item=from.items.find(i=>i.id===p.id);if(!item)return;if(plan){const to=plan.page,[x,y]=plan.map([item.x,item.y]);item.x=nbClamp(Math.round(x),0,Math.max(0,Math.floor(to.width-item.w)));item.y=nbClamp(Math.round(y),0,Math.max(0,Math.floor(to.height-item.h)));if(onto){from.items=from.items.filter(i=>i!==item);to.items.push(item);}}else{item.w=Math.round(Math.max(20,item.w+p.dx));item.h=Math.round(Math.max(16,item.h+p.dy));}}); // i18n:keep — the undo label (not shown)
+    if(onto){nbRefreshPage(p.el);nbRefreshPage(plan.el);nbMarkFocus();}else nbSelectionDraw();return;}
   if(p.kind==='erase'){if(p.erased.size||p.cut.size)nbChange('지우기',()=>{const page=nbPage(pageId);page.strokes=page.strokes.flatMap(s=>p.erased.has(s.id)?[]:p.cut.has(s.id)?globalThis.appInk.pieces(s,p.cut.get(s.id)).map(piece=>({...piece,id:nbId()})):[s]);});nbSave(true);nbDrawPage(p.el);return;} // i18n:keep — the undo label (not shown)
   if(p.kind==='lasso'){
     nbDrawPage(p.el);const page=nbPage(pageId),inside=globalThis.appInk.inside,centre=b=>[(b.x0+b.x1)/2,(b.y0+b.y1)/2];if(!page||p.path.length<3)return;
@@ -287,10 +306,20 @@ function nbEnd(){
     nbSelect({pageId,strokes,items});toast(tr('{n}개를 선택했습니다. 끌어서 옮기고, 모서리로 크기를 바꾸고, 위의 막대로 복제·삭제합니다(Ctrl+D·Delete).',{n:strokes.length+items.length}));return;
   }
   if(p.kind==='shift'||p.kind==='scale'){
-    document.body.classList.remove('ink-grabbing');const {map,k}=nbSelMap(p);
-    if(p.kind==='shift'?Math.hypot(p.last[0]-p.start[0],p.last[1]-p.start[1])<1:Math.abs(k-1)<.01){nbRefreshPage(p.el);return;}
-    const sel=nb.sel;nbChange(p.kind==='shift'?'이동':'크기',()=>{const page=nbPage(pageId);page.strokes=page.strokes.map(st=>sel.strokes.includes(st.id)?nbMoved(st,map,k):st);page.items=page.items.map(i=>sel.items.includes(i.id)?nbMovedItem(i,map,k,page):i);}); // i18n:keep — the undo label (not shown)
-    nbRefreshPage(p.el);return;
+    document.body.classList.remove('ink-grabbing');const sel=nb.sel;
+    if(!sel){for(const el of new Set([p.el,p.shown].filter(Boolean)))if(el.isConnected)nbRefreshPage(el);return;}
+    if(p.slop&&!p.moved){nbRefreshPage(p.el);return;}
+    const plan=p.kind==='shift'?nbDrop(p.el,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],p.client):null,{map,k}=plan?{map:plan.map,k:1}:nbSelMap(p);
+    // Every page the drag drew on is drawn again from what it holds.
+    const refresh=()=>{for(const el of new Set([p.el,p.shown,plan?.el].filter(Boolean)))nbRefreshPage(el);};
+    if(p.kind==='shift'?Math.hypot(p.last[0]-p.start[0],p.last[1]-p.start[1])<1:Math.abs(k-1)<.01){refresh();return;}
+    // Moved onto another page, the selection becomes that page's (one undo step for both pages).
+    const onto=plan&&plan.el!==p.el?plan.page:null;
+    nbChange(p.kind==='shift'?'이동':'크기',()=>{const page=nbPage(pageId),to=onto||page; // i18n:keep — the undo label (not shown)
+      if(!onto){page.strokes=page.strokes.map(st=>sel.strokes.includes(st.id)?nbMoved(st,map,k):st);page.items=page.items.map(i=>sel.items.includes(i.id)?nbMovedItem(i,map,k,page):i);return;}
+      to.strokes.push(...page.strokes.filter(st=>sel.strokes.includes(st.id)).map(st=>nbMoved(st,map,1)));to.items.push(...page.items.filter(i=>sel.items.includes(i.id)).map(i=>nbMovedItem(i,map,1,to)));
+      page.strokes=page.strokes.filter(st=>!sel.strokes.includes(st.id));page.items=page.items.filter(i=>!sel.items.includes(i.id));});
+    if(onto)nb.sel={...sel,pageId:onto.id};refresh();return;
   }
   if(p.kind==='shape'){if(Math.hypot(p.last[0]-p.start[0],p.last[1]-p.start[1])<3){nbDrawPage(p.el);return;}nbChange('도형',()=>nbPage(pageId).strokes.push({id:nbId(),...nbShape(p)}));nbSave(true);nbDrawPage(p.el);return;} // i18n:keep — the undo label (not shown)
   if(!p.points.length)return;const ink=globalThis.appInk;
@@ -310,7 +339,7 @@ const nbBoxes=new WeakMap();
 function nbStrokeBox(st){const kept=nbBoxes.get(st);if(kept)return kept;const box=nbStrokeBoxOf(st);nbBoxes.set(st,box);return box;}
 function nbStrokeBoxOf(st){let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(let i=0;i<st.points.length;i+=4){x0=Math.min(x0,st.points[i]);x1=Math.max(x1,st.points[i]);y0=Math.min(y0,st.points[i+1]);y1=Math.max(y1,st.points[i+1]);}const pad=(st.tool==='highlighter'?st.width:st.width*1.6)/2;return {x0:x0-pad,y0:y0-pad,x1:x1+pad,y1:y1+pad};}
 const nbItemBox=i=>({x0:i.x,y0:i.y,x1:i.x+i.w,y1:i.y+i.h});
-function nbSelect(sel){nb.sel=sel;if(sel)globalThis.appInk.clearSelection();nbSelectionDraw();}
+function nbSelect(sel){nb.sel=sel;if(sel){globalThis.appInk.clearSelection();if(nbFocus){nbFocus=null;nbMarkFocus();}}nbSelectionDraw();}
 // The selection box is measured from the page each time it is drawn, so an
 // undo, a box moved with the reading tool or a redraw never leaves it stale.
 function nbSelectionDraw(){
@@ -332,15 +361,51 @@ function nbSelMap(p){
 const nbRound=n=>Math.round(n*100)/100,nbClamp=(n,lo,hi)=>Math.min(hi,Math.max(lo,n));
 function nbMoved(st,map,k){const points=[...st.points];for(let i=0;i<points.length;i+=4){const [x,y]=map([points[i],points[i+1]]);points[i]=nbRound(x);points[i+1]=nbRound(y);}return {...st,points,...(k===1?{}:{width:nbClamp(nbRound(st.width*k),.1,100)})};}
 function nbMovedItem(item,map,k,page){const [x,y]=map([item.x,item.y]);return {...item,x:nbClamp(Math.round(x),-2000,4000),y:nbClamp(Math.round(y),-2000,page?.board?NB_BOARD_MAX:4000),w:nbClamp(Math.round(item.w*k),1,4000),h:nbClamp(Math.round(item.h*k),1,4000),...(item.type==='text'&&k!==1?{size:nbClamp(Math.round((item.size||12)*k*10)/10,6,72),...(item.border?{border:{...item.border,width:nbClamp(Math.round(item.border.width*k*10)/10,.5,6)}}:{})}:{})};}
+// Where something dragged on a notebook page lands: on the page under the pointer (the nearest page when it is over
+// none), its box (points of the page it is on, moved by the drag d) taken there through the screen and kept inside that
+// page (its top-left kept when it is larger), so what is moved never ends up off a page, where nothing shows it. What
+// is moved keeps its size in points. Returns the page's element and data, the box there, and map() for points.
+function nbDrop(el,box,[dx,dy],[cx,cy]){
+  let target=el,best=Infinity;
+  for(const other of el.closest('.nb-pages')?.querySelectorAll('.nb-page')||[]){const r=other.getBoundingClientRect(),d=Math.hypot(Math.max(r.left-cx,0,cx-r.right),Math.max(r.top-cy,0,cy-r.bottom));if(d<best&&nbPage(other.dataset.pageId)){best=d;target=other;if(!d)break;}}
+  const page=nbPage(target.dataset.pageId),a=el.getBoundingClientRect(),b=target.getBoundingClientRect(),s=nbSize(el),w=box.x1-box.x0,h=box.y1-box.y0;
+  const x0=(a.left+(box.x0+dx)/s.w*a.width-b.left)/b.width*page.width,y0=(a.top+(box.y0+dy)/s.h*a.height-b.top)/b.height*page.height;
+  const nx=w>=page.width?0:nbClamp(x0,0,page.width-w),ny=h>=page.height?0:nbClamp(y0,0,page.height-h),ox=nx-box.x0,oy=ny-box.y0;
+  return {el:target,page,box:{x0:nx,y0:ny,x1:nx+w,y1:ny+h},map:([x,y])=>[x+ox,y+oy]};
+}
+// A box's element put where a drag will land it (nbDrop), on that page; a folded memo card keeps its own height.
+function nbPlaceNode(node,item,plan){
+  if(!node)return;const m=nbMovedItem(item,plan.map,1,plan.page),page=plan.page;if(node.parentElement!==plan.el)plan.el.querySelector(':scope>.nb-ink').before(node);
+  Object.assign(node.style,{left:pct(m.x,page.width),top:pct(m.y,page.height),width:pct(m.w,page.width)},node.matches('.nb-memo-card:not(.open)')?{}:{height:pct(m.h,page.height)});
+}
 function nbSelectionPreview(p,page){
-  const {map,k}=nbSelMap(p),sel=nb.sel;
+  const sel=nb.sel;
+  // The selection let go of mid-drag (Esc, undo): every page the drag drew on is drawn again from what it holds.
+  if(!sel){for(const el of new Set([p.el,p.shown].filter(Boolean)))if(el.isConnected)nbRefreshPage(el);p.shown=null;return;}
+  // A lasso selection being moved is drawn where it will land: its strokes on that page's canvas (not on the page
+  // they were on), its boxes and the selection's box on that page.
+  if(p.kind==='shift'){
+    const plan=nbDrop(p.el,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],p.client),list=p.el.closest('.nb-pages')||document;
+    if(p.shown&&p.shown!==plan.el&&p.shown!==p.el)nbDrawPage(p.shown);p.shown=plan.el;
+    if(plan.el===p.el)nbPaint(p.el,page.strokes.map(st=>sel.strokes.includes(st.id)?nbMoved(st,plan.map,1):st));
+    else{nbPaint(p.el,page.strokes.filter(st=>!sel.strokes.includes(st.id)));nbPaint(plan.el,[...plan.page.strokes,...page.strokes.filter(st=>sel.strokes.includes(st.id)).map(st=>nbMoved(st,plan.map,1))]);}
+    for(const item of page.items)if(sel.items.includes(item.id))nbPlaceNode(list.querySelector(`.nb-item[data-item-id="${CSS.escape(item.id)}"]`),item,plan);
+    const box=list.querySelector('.nb-selection'),b=plan.box;if(box){if(box.parentElement!==plan.el)plan.el.append(box);Object.assign(box.style,{left:pct(b.x0,plan.page.width),top:pct(b.y0,plan.page.height),width:pct(b.x1-b.x0,plan.page.width),height:pct(b.y1-b.y0,plan.page.height)});}
+    return;
+  }
+  const {map,k}=nbSelMap(p);
   nbPaint(p.el,page.strokes.map(st=>sel.strokes.includes(st.id)?nbMoved(st,map,k):st));
   for(const item of page.items)if(sel.items.includes(item.id)){const node=p.el.querySelector(`[data-item-id="${CSS.escape(item.id)}"]`),m=nbMovedItem(item,map,k,page);if(node)Object.assign(node.style,{left:pct(m.x,page.width),top:pct(m.y,page.height),width:pct(m.w,page.width),height:pct(m.h,page.height)});}
   const box=p.el.querySelector('.nb-selection'),b=sel.box,[x0,y0]=map([b.x0,b.y0]),[x1,y1]=map([b.x1,b.y1]);if(box)Object.assign(box.style,{left:pct(x0,page.width),top:pct(y0,page.height),width:pct(x1-x0,page.width),height:pct(y1-y0,page.height)});
 }
 // One page redrawn in place (its boxes, ink and selection), keeping the scroll position.
 function nbRefreshPage(el){const page=nbPage(el.dataset.pageId);if(!page)return;nbPaintPins(el,nbPinIndex());el.querySelectorAll(':scope>.nb-item').forEach(n=>n.remove());el.querySelector('.nb-ink').insertAdjacentHTML('beforebegin',page.items.map(item=>nbItemHtml(item,page)).join(''));nbLoadAssets(el);nbDrawPage(el);nbSelectionDraw();}
-function nbHover(el,event){const sel=nb.sel?.pageId===el.dataset.pageId?nb.sel:null;el.classList.toggle('ink-over-selection',Boolean(sel?.box&&globalThis.appInk.tool==='lasso'&&nbInBox(sel.box,nbPoint(el,event))));}
+function nbHover(el,event){const sel=nb.sel?.pageId===el.dataset.pageId?nb.sel:null,tool=globalThis.appInk.tool;el.classList.toggle('ink-over-selection',Boolean(sel?.box&&tool==='lasso'&&nbInBox(sel.box,nbPoint(el,event))));
+  // With the select tool, over a stroke it can move: an open hand.
+  el.classList.toggle('ink-over-stroke',tool==='read'&&event.pointerType!=='touch'&&!event.target.closest?.('.nb-item')&&Boolean(nbStrokeAt(el,nbPage(el.dataset.pageId),nbPoint(el,event))));}
+// The pen stroke or shape drawn on top at a point of a page (points), within about 8 screen pixels of its line, as on
+// PDF pages (desktop/ink.js inkStrokeReach); highlighters are moved with the lasso.
+function nbStrokeAt(el,page,[x,y]){if(!page)return null;const reach=globalThis.appInk.strokeReach,radius=8/nbScale(el);for(let i=page.strokes.length-1;i>=0;i--){const st=page.strokes[i];if(st.tool==='pen'&&reach(st,x,y,radius))return st;}return null;}
 // A copy a little below and right of the selection, which becomes the selection.
 function nbSelDuplicate(){
   const sel=nb.sel,el=sel&&nbPageEl(sel.pageId);if(!el)return;const off=14,move=([x,y])=>[x+off,y+off],strokes=[],items=[];
@@ -350,7 +415,7 @@ function nbSelDuplicate(){
 function nbSelDelete(){const sel=nb.sel,el=sel&&nbPageEl(sel.pageId);if(!el)return;nbChange('삭제',()=>{const page=nbPage(sel.pageId);page.strokes=page.strokes.filter(st=>!sel.strokes.includes(st.id));page.items=page.items.filter(i=>!sel.items.includes(i.id));});nb.sel=null;nbRefreshPage(el);} // i18n:keep — the undo label (not shown)
 // With a selection holding strokes, a palette colour recolours them.
 const nbUseColorBase=inkUseColor;
-inkUseColor=function(color){const sel=nb.sel,el=sel&&nbPageEl(sel.pageId);if(el&&sel.strokes.length&&['lasso','hand'].includes(globalThis.appInk.tool)){nbChange('색',()=>{for(const st of nbPage(sel.pageId).strokes)if(sel.strokes.includes(st.id))st.color=color;});nbDrawPage(el);return;}nbUseColorBase(color);}; // i18n:keep — the undo label (not shown)
+inkUseColor=function(color){const sel=nb.sel,el=sel&&nbPageEl(sel.pageId);if(el&&sel.strokes.length&&['lasso','hand','read'].includes(globalThis.appInk.tool)){nbChange('색',()=>{for(const st of nbPage(sel.pageId).strokes)if(sel.strokes.includes(st.id))st.color=color;});nbDrawPage(el);return;}nbUseColorBase(color);}; // i18n:keep — the undo label (not shown)
 // The page memo: typing goes into the text box under the pointer, or into a new one placed there.
 // The memo tool (Ctrl+7) pins a new memo where the page is pressed, as on the source pages, and opens it.
 function nbMemoAt(el,[x,y]){
@@ -371,7 +436,7 @@ document.addEventListener('keydown',event=>{
   if(!nbPageEl(nb.sel.pageId)){nb.sel=null;return;}
   // Esc lets go of the selection wherever the keyboard is; the other keys act only outside text fields (as on PDF pages).
   if(event.key==='Escape'){if(!event.defaultPrevented){event.preventDefault();nbSelect(null);}return;}
-  if(event.target.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+  if(event.defaultPrevented||event.target.closest?.('input,textarea,select,[contenteditable="true"]'))return;
   if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();nbSelDelete();}
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='d'){event.preventDefault();nbSelDuplicate();}
 });
@@ -720,18 +785,10 @@ document.addEventListener('input',event=>{const area=event.target.closest('.nb-t
 let nbTextBefore=null;
 function nbTextStepStart(){if(!nbTextBefore&&nb.doc)nbTextBefore={id:nb.doc.id,pages:JSON.stringify(nb.doc.pages)};}
 function nbTextStepEnd(){const step=nbTextBefore;nbTextBefore=null;if(!step||nb.doc?.id!==step.id)return;const before=step.pages,after=JSON.stringify(nb.doc.pages),id=step.id;if(before!==after)globalThis.appInk.record({custom:true,label:'텍스트',undo:()=>{if(nb.doc?.id!==id)return;nb.doc.pages=JSON.parse(before);nbSave();nbRender();},redo:()=>{if(nb.doc?.id!==id)return;nb.doc.pages=JSON.parse(after);nbSave();nbRender();}});} // i18n:keep — the undo label (not shown)
-let nbLetGo=null;
-document.addEventListener('pointerdown',event=>{if(nbLetGo&&!event.target.closest?.('.ink-toolbar,.ink-flyout'))nbLetGo=null;},true);
-document.addEventListener('keydown',event=>{if(event.key==='Escape')nbLetGo=null;},true);
 document.addEventListener('click',event=>{
   const action=event.target.closest('[data-nb-selection]');if(action){if(action.dataset.nbSelection==='delete')nbSelDelete();else nbSelDuplicate();return;}
-  // As on PDF pages: the lasso and the hand keep a selection; the reading (select) tool and the drawing tools let go of
-  // it, and the hand chosen next from the reading button's menu takes back one let go of by choosing reading.
-  if(event.target.closest('[data-ink-tool],[data-ink-pick]')){const tool=globalThis.appInk.tool;
-    if(tool==='hand'){const sel=nbLetGo;nbLetGo=null;if(sel&&!nb.sel&&nbPageEl(sel.pageId))nbSelect(sel);}
-    else if(tool==='lasso')nbLetGo=null;
-    else if(nb.sel){nbLetGo=tool==='read'?nb.sel:null;nbSelect(null);}
-    else if(tool!=='read')nbLetGo=null;}
+  // As on PDF pages: the lasso, the hand and the select tool keep a selection; the drawing tools let go of it.
+  if(event.target.closest('[data-ink-tool],[data-ink-pick]')&&nb.sel&&!['hand','lasso','read'].includes(globalThis.appInk.tool))nbSelect(null);
   const remove=event.target.closest('.nb-item [data-nb-remove]');if(remove){nbRemoveItem(remove.closest('[data-item-id]').dataset.itemId);return;}
   const op=event.target.closest('[data-nb-page]');if(op){const id=op.dataset.pageId,pages=nb.doc.pages,i=pages.findIndex(p=>p.id===id);if(i<0)return;
     nbChange('페이지',()=>{if(op.dataset.nbPage==='dup')pages.splice(i+1,0,{...JSON.parse(JSON.stringify(pages[i])),id:nbId(),items:pages[i].items.map(it=>({...it,id:nbId()})),strokes:pages[i].strokes.map(s=>({...s,id:nbId()}))});if(op.dataset.nbPage==='up'&&i>0)[pages[i-1],pages[i]]=[pages[i],pages[i-1]];if(op.dataset.nbPage==='down'&&i<pages.length-1)[pages[i+1],pages[i]]=[pages[i],pages[i+1]];if(op.dataset.nbPage==='delete'&&pages.length>1)pages.splice(i,1);if(op.dataset.nbPage==='trim'&&!nbTrimBoard(pages[i]))toast(tr('잘라낼 빈 아래쪽이 없습니다.'));});nbRender();return;} // i18n:keep — the undo label (not shown)
