@@ -42,7 +42,7 @@ const insight = require('./insight.cjs');
 const { CorrectionStore } = require('./corrections.cjs');
 const { NotebookStore, notebookHtml, notesMarkdown } = require('./notebook.cjs');
 const { ThemeStore } = require('./themes.cjs');
-const { releaseFeed, latestRelease, due, noticeFor } = require('./update-check.cjs');
+const { releaseFeed, latestRelease, due, noticeFor, UPDATE_EVERY, storedRelease } = require('./update-check.cjs');
 const { normalizeLanguage, initialLanguage, languageAskAtStart, startupLanguage, patchLanguage, languageInfo, aiLanguage, translationLanguage, systemLanguagesFrom, keepLanguage } = require('./language.cjs');
 const { setUiLanguage, tr, trIn } = require('../core/i18n.js');
 const { LANGUAGES } = require('../core/languages.cjs');
@@ -146,19 +146,28 @@ function allowedSender(event,name){
   if (!allowed && process.env.APP_DEBUG_IPC) console.warn('refused', name);
   return allowed;
 }
-// Whether a newer release is out: asked of GitHub once a day at most, once the window is up. Not asked by the Microsoft
-// Store's package (the Store updates it), when switched off in the settings (features.updateCheck), or with
+// Whether a newer release is out: asked of GitHub once the window is up (not again within half an hour, so a few
+// restarts ask once), every six hours while the app is open (APP_UPDATE_EVERY_MS, a test's shorter time), and at once
+// from 지금 확인 in the settings. The newest release found is kept (updateLatest), so a notice put off (나중에) is told
+// again at the next start even when GitHub is not asked then. Not asked by the Microsoft Store's package (the Store
+// updates it), when switched off in the settings (features.updateCheck; 지금 확인 still asks), or with
 // APP_UPDATE_FEED=off (the tests); another value of that variable is the address asked instead (a test's own server).
-// A check that got no answer is not counted, so the next start asks again.
+// A check that got no answer is not counted, so the next one asks again.
+// Returns what 지금 확인 says: {store}, {off}, {failed}, or {current, latest, notice}.
 let pendingUpdate=null;
-async function checkForUpdate(){
-  const override=process.env.APP_UPDATE_FEED;
-  if(process.windowsStore||override==='off'||!features(config).updateCheck?.enabled||!due(config.updateCheckedAt,Date.now()))return;
+const tellUpdate=()=>{if(pendingUpdate&&win&&!win.isDestroyed())win.webContents.send('update-available',pendingUpdate);};
+async function checkForUpdate({every=UPDATE_EVERY.start,now=false}={}){
+  const override=process.env.APP_UPDATE_FEED,current=app.getVersion();
+  if(process.windowsStore)return {store:true};
+  if(override==='off'||!now&&!features(config).updateCheck?.enabled)return {off:true};
+  if(!now&&!due(config.updateCheckedAt,Date.now(),every)){pendingUpdate=noticeFor({current,release:storedRelease(config.updateLatest),skipped:config.updateSkipped});tellUpdate();return {current};}
   const release=await latestRelease({fetch:(...args)=>net.fetch(...args),feed:override||releaseFeed(require('../package.json').repository?.url)});
-  if(!release)return;
-  config={...config,updateCheckedAt:Date.now()};await atomicJson(configFile,config);
-  pendingUpdate=noticeFor({current:app.getVersion(),release,skipped:config.updateSkipped});
-  if(pendingUpdate&&win&&!win.isDestroyed())win.webContents.send('update-available',pendingUpdate);
+  if(!release){if(!now){pendingUpdate=noticeFor({current,release:storedRelease(config.updateLatest),skipped:config.updateSkipped});tellUpdate();}return {failed:true,current};}
+  config={...config,updateCheckedAt:Date.now(),updateLatest:release};await atomicJson(configFile,config);
+  // Asked for (지금 확인), a newer release is told even when it was skipped.
+  pendingUpdate=noticeFor({current,release,skipped:now?undefined:config.updateSkipped});
+  if(!now)tellUpdate();
+  return {current,latest:release.version,notice:pendingUpdate};
 }
 // The open vault's folder is not where it was (storage.cjs gone); a folder that cannot be looked at counts as there.
 const vaultGone=()=>Promise.resolve(library?.gone()).then(Boolean,()=>false);
@@ -1096,6 +1105,7 @@ if(singleInstance)app.whenReady().then(async () => {
   // the browser; the app installs nothing itself. A skipped version is kept and not offered again.
   register('update-pending',()=>pendingUpdate,false);
   register('update-open',async()=>{if(pendingUpdate)await shell.openExternal(pendingUpdate.url);},false);
+  register('update-check-now',()=>checkForUpdate({now:true}),false);
   register('update-skip',async()=>{if(!pendingUpdate)return;config={...config,updateSkipped:pendingUpdate.version};pendingUpdate=null;await atomicJson(configFile,config);});
   register('preferences', async values => {
     if (!Object.hasOwn(providers, values.provider) || !['web', 'api', 'local'].includes(values.mode)) throw Error(tr('지원하지 않는 번역 연결입니다.'));
@@ -1113,6 +1123,8 @@ if(singleInstance)app.whenReady().then(async () => {
   register('reveal-original', async (id, paperId) => { shell.showItemInFolder(await current(id).resolveFile(paperId, 'original')); });
   await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   checkForUpdate().catch(error=>record('update-check',error));
+  {const every=Number(process.env.APP_UPDATE_EVERY_MS)>0?Number(process.env.APP_UPDATE_EVERY_MS):UPDATE_EVERY.open;
+    setInterval(()=>checkForUpdate({every}).catch(error=>record('update-check',error)),every).unref?.();}
   if(development){
     const marker=path.join(__dirname,'..','dist','.dev-reload.json');
     let timer,busy=false;

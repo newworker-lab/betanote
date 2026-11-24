@@ -1,8 +1,11 @@
 // Whether a newer release is out (docs/DEVELOPMENT.md, 새 버전 알림). The app asks GitHub for the repository's latest
-// release, once a day at most, and tells the person when its version is newer than the one running; it installs
-// nothing. Only that one public address is asked: nothing about the person, the vault or the papers is sent.
-// Everything here is free of Electron: main.cjs gives it the fetch and the settings.
+// release at each start and every six hours while it is open, and tells the person when its version is newer than the
+// one running; it installs nothing. Only that one public address is asked: nothing about the person, the vault or the
+// papers is sent. Everything here is free of Electron: main.cjs gives it the fetch and the settings.
 const DAY = 24 * 60 * 60 * 1000;
+// How long after a check GitHub is not asked again: at a start (a few restarts ask once), and while the app is open.
+// Asked once a day at most (1.1.0–1.1.2), a release out the same day was not told until the next day's start.
+const UPDATE_EVERY = Object.freeze({ start: 30 * 60 * 1000, open: 6 * 60 * 60 * 1000 });
 // "v1.2.3" or "1.2.3"; a pre-release or anything else is no version to compare.
 function parseVersion(text) {
   const match = typeof text === 'string' && /^v?(\d+)\.(\d+)\.(\d+)$/.exec(text);
@@ -28,17 +31,25 @@ async function latestRelease({ fetch, feed, timeoutMs = 8000 }) {
     if (!response?.ok) return null;
     const body = await response.json();
     if (!body || typeof body !== 'object' || Array.isArray(body) || body.draft === true || body.prerelease === true) return null;
-    const version = parseVersion(body.tag_name), url = typeof body.html_url === 'string' ? body.html_url : '';
-    if (!version || !/^https:\/\/github\.com\/[^\s]+$/.test(url) || url.length > 300) return null;
-    return { version: version.join('.'), url };
-  } catch { return null; /* no network, a refusal, an answer that is not JSON: asked again another day */ }
+    return releaseOf(body.tag_name, body.html_url);
+  } catch { return null; /* no network, a refusal, an answer that is not JSON: asked again at the next start */ }
   finally { clearTimeout(timer); }
 }
-// Asked once a day at most. A time that is no number, or lies in the future (a clock set back), does not hold it off.
+// A release as kept: its version and its page on github.com, or null.
+function releaseOf(tag, page) {
+  const version = parseVersion(tag), url = typeof page === 'string' ? page : '';
+  if (!version || !/^https:\/\/github\.com\/[^\s]+$/.test(url) || url.length > 300) return null;
+  return { version: version.join('.'), url };
+}
+// The newest release found, kept in the settings (updateLatest) so that a notice put off (나중에) is told again at the
+// next start even when GitHub is not asked then. Read back as a release, or null (the file may have been edited).
+function storedRelease(value) { return value && typeof value === 'object' && !Array.isArray(value) ? releaseOf(value.version, value.url) : null; }
+// Asked again once `every` has passed (UPDATE_EVERY). A time that is no number, or lies in the future (a clock set
+// back), does not hold it off.
 function due(lastAt, now, every = DAY) { return !(Number.isFinite(lastAt) && lastAt > 0 && lastAt <= now && now - lastAt < every); }
 // What the person is told: a release newer than the app running, unless it is the one they chose to skip.
 function noticeFor({ current, release, skipped }) {
   if (!release || !isNewer(release.version, current) || release.version === skipped) return null;
   return { version: release.version, url: release.url, current };
 }
-module.exports = { parseVersion, isNewer, releaseFeed, latestRelease, due, noticeFor };
+module.exports = { parseVersion, isNewer, releaseFeed, latestRelease, due, noticeFor, UPDATE_EVERY, storedRelease };

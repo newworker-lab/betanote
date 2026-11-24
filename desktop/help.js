@@ -78,7 +78,7 @@ document.addEventListener('keydown',event=>{
 // ---- 설정 → 알림·도움말 ----
 function generalSummary(){return featureOn('notifications')?tr('번역 완료 알림 켬'):tr('번역 완료 알림 끔');}
 function generalSection(){
-  return `<label class="llm-check"><input type="checkbox" id="kn-notify" ${featureOn('notifications')?'checked':''}> ${tr('번역이 끝나면 알림 보내기')}</label><p class="small muted">${tr('창이 뒤에 있을 때만 시스템 알림을 보냅니다. 번역 진행률은 작업 표시줄의 앱 아이콘에도 표시됩니다.')}</p><label class="llm-check"><input type="checkbox" id="kn-update" ${featureOn('updateCheck')?'checked':''}> ${tr('시작할 때 새 버전 확인')}</label><p class="small muted">${tr('하루에 한 번까지 GitHub의 공개 릴리스 정보만 확인합니다. 자료나 사용 기록은 보내지 않으며, 새 버전이 있으면 알리기만 하고 설치하지 않습니다.')}</p><div class="row">${btn(tr('단축키 보기'),'shortcuts')}</div>`;
+  return `<label class="llm-check"><input type="checkbox" id="kn-notify" ${featureOn('notifications')?'checked':''}> ${tr('번역이 끝나면 알림 보내기')}</label><p class="small muted">${tr('창이 뒤에 있을 때만 시스템 알림을 보냅니다. 번역 진행률은 작업 표시줄의 앱 아이콘에도 표시됩니다.')}</p><label class="llm-check"><input type="checkbox" id="kn-update" ${featureOn('updateCheck')?'checked':''}> ${tr('새 버전 확인')}</label><p class="small muted">${tr('앱을 켤 때와 켜 둔 동안 6시간마다 GitHub의 공개 릴리스 정보만 확인합니다. 자료나 사용 기록은 보내지 않으며, 새 버전이 있으면 알리기만 하고 설치하지 않습니다.')}</p><div class="row">${btn(tr('지금 확인'),'update-check-now')}</div><div class="row">${btn(tr('단축키 보기'),'shortcuts')}</div>`;
 }
 document.addEventListener('change',event=>{
   const feature={'kn-notify':'notifications','kn-update':'updateCheck'}[event.target.id];if(!feature)return;
@@ -157,15 +157,23 @@ async function followVaultFiles(){
 }
 window.appApi.onVaultFilesChanged?.(id=>{if(id!==state.storageKey)return;vaultFiles.pending=true;followVaultFiles();});
 
-// The new-version notice (main.cjs checkForUpdate): told once a run, after any dialog in use and after the first start's
-// language question. 내려받기 opens the release's page in the browser; nothing is installed from here.
-let updateTold=false;
-function showUpdate(info){
-  if(!info||updateTold)return;
-  if(dialog.open||document.querySelector('.language-first')){setTimeout(()=>showUpdate(info),1500);return;}
-  updateTold=true;
+// The new-version notice (main.cjs checkForUpdate): each version told once a run, after any dialog in use and after the
+// first start's language question; one asked for with 지금 확인 is told at once, in place of the settings.
+// 내려받기 opens the release's page in the browser; nothing is installed from here.
+let updateTold=null;
+function showUpdate(info,asked=false){
+  if(!info||!asked&&updateTold===info.version)return;
+  if(!asked&&(dialog.open||document.querySelector('.language-first'))){setTimeout(()=>showUpdate(info),1500);return;}
+  updateTold=info.version;
   modal(tr('새 버전이 있습니다'),`<p>${tr('{app} {version}이(가) 나왔습니다. 지금 쓰는 버전은 {current}입니다.',{app:esc(appName.name),version:esc(info.version),current:esc(info.current)})}</p><p class="small muted">${tr('내려받기를 누르면 브라우저에서 릴리스 페이지가 열립니다. 새 판으로 바꿔도 저장소의 자료와 설정은 그대로입니다.')}</p>`,btn(tr('나중에'),'close')+btn(tr('이 버전 건너뛰기'),'update-skip')+btn(tr('내려받기'),'update-open','primary'));
 }
-Object.assign(actions,{'update-open':runDesktop(async()=>{await window.appApi.openUpdate();dialog.close();}),'update-skip':runDesktop(async()=>{await window.appApi.skipUpdate();dialog.close();})});
+Object.assign(actions,{'update-open':runDesktop(async()=>{await window.appApi.openUpdate();dialog.close();}),'update-skip':runDesktop(async()=>{await window.appApi.skipUpdate();dialog.close();}),
+  // 지금 확인 (설정 → 일반): asks GitHub now, whatever the time of the last check.
+  'update-check-now':runDesktop(async()=>{const r=await window.appApi.checkUpdateNow();
+    if(r.store)toast(tr('Microsoft Store에서 받은 앱은 Store가 새 버전으로 바꿉니다.'));
+    else if(r.off)toast(tr('새 버전 확인을 쓸 수 없습니다.'));
+    else if(r.failed)toast(tr('새 버전을 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요.'),5000);
+    else if(r.notice)showUpdate(r.notice,true);
+    else toast(tr('지금 쓰는 {version}이(가) 최신 버전입니다.',{version:r.current}));})});
 window.appApi.onUpdateAvailable?.(showUpdate);
 window.appApi.pendingUpdate?.().then(showUpdate,()=>{});

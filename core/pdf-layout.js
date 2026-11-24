@@ -158,6 +158,43 @@
       return t===b.translation?b:{...b,translation:t};
     })});
   }
+  // Words of a sentence, as against the names an equation or a line of code carries: a word in Latin letters alone
+  // (two or more, lower case but for a first capital) that is no part of a name ("max_depth", "z3.Int",
+  // "branchInfo"), no function called or indexed ("transfer(…)", "buf[…]"), no name of math and no keyword of code,
+  // and no operand: none with a sign of math or an opening bracket right before it, or a sign or a closing bracket
+  // right after ("precision = TP / …", "P(fault | data)"). `weak` marks the words code uses too ("with", "in",
+  // "class"): they count beside another word only.
+  const MATH_NAME=/^(?:min|max|arg|exp|log|ln|sin|cos|tan|tanh|diag|det|sup|inf|lim|tr|softmax)$/i;
+  const CODE_WORD=/^(?:if|else|elif|for|while|return|def|import|int|char|void|var|let|const|function|print|assume|pass|yield|continue|break|then|end|do|none|true|false|null)$/i;
+  const WEAK_WORD=/^(?:class|with|where|from|in|is|not|and|or|as|to|of|on|at|by)$/i;
+  function sentenceWords(text){
+    const out=[],value=String(text);
+    for(const m of value.matchAll(/(?<![\p{L}\p{N}_.$@#\\])[A-Z]?[a-z]+(?![\p{L}\p{N}_([]|\.\p{L})/gu)){
+      if(m[0].length<2||MATH_NAME.test(m[0])||CODE_WORD.test(m[0]))continue;
+      const before=value.slice(0,m.index).trimEnd().slice(-1),after=value.slice(m.index+m[0].length).trimStart()[0]||'';
+      // A short capitalised token inside a line is as likely a symbol with its index ("λ Lreg", "Var", "Cov").
+      if(/^[A-Z]/.test(m[0])&&m[0].length<5&&before&&!/[.?!:•◦▪‣⁃▶►-]/.test(before))continue;
+      if(/[=<>≤≥≠≈∝∈+\-−×·*/|^([{"'‘’“”`]/.test(before)||/[=<>≤≥≠≈∝∈+\-−×·*/|^)\]}"'‘’“”`]/.test(after))continue;
+      out.push({word:m[0],at:m.index,end:m.index+m[0].length,weak:WEAK_WORD.test(m[0])});
+    }
+    return out;
+  }
+  // A line that reads as a sentence though a relation stands in it ("(2, 9) reaches r = 1.", "r = 2 never runs, and
+  // f", "α = 714, at once.", a heading "No Input Reaches r = 2", a bullet "• Concolic: with x = 5, the"): two words
+  // of a sentence side by side, a word of four letters in a line that ends as a sentence does, or a list bullet and
+  // a word. Lecture slides set such lines among their bullets; read as formulas they stayed in the source language
+  // between translated lines, and cut their paragraphs in two.
+  function sentenceLine(text){
+    const value=String(text),words=sentenceWords(value),strong=w=>!w.weak&&w.word.length>=3;
+    if(words.some((w,i)=>i&&/^[ \t]*,?[ \t]*$/.test(value.slice(words[i-1].end,w.at))&&(strong(w)||strong(words[i-1]))))return true;
+    if(/^\s*[•◦▪‣⁃▶►▸▹▷➤➢➔]\s*$/.test(value.slice(0,words.find(strong)?.at??0)))return true;
+    return /[.?!]["'”’)\]]*\s*$/.test(value)&&words.some(w=>!w.weak&&w.word.length>=4);
+  }
+  // Light math in such a line (no sum, root or script, every glyph read): a few symbols among the words.
+  function lightMath(text){
+    const value=String(text),letters=(value.match(/\p{L}/gu)||[]).length||1;
+    return !/[∑∏∫√∂∇^\uFFFD\u0000-\u0008\uE000-\uF8FFðþÞ]/u.test(value)&&!mathSpans(value).length&&sentenceLine(value)&&(value.match(/[≈≠≤≥∞=α-ωΑ-Ω]/gu)||[]).length/letters<=.25;
+  }
   function mathDense(text){
     text=repairGlyphs(text);
     if(/(?:z?ffl){2,}/u.test(text))return true;
@@ -165,7 +202,8 @@
     const broken=(text.match(/[\uFFFD\u0000-\u0008\uE000-\uF8FFðþÞ]/gu)||[]).length;
     // μ before a unit (μm, μg ml⁻¹, μM, μmol) is the micro prefix of a measure, not a symbol: an axis label "Cell width (μm)" is text.
     const unitless=text.replace(/[μµ](?=(?:mol|m|g|l|L|M|s|A|V|W|Hz|F|N|J|Pa)(?!\p{L}))/gu,'');
-    const symbols=(unitless.match(/[∑∏∫√≈≠≤≥∞∂∇=^_α-ωΑ-Ω\u0300-\u036f]/gu)||[]).length+mathSpans(text).reduce((n,s)=>n+s.text.length,0);
+    // An underscore inside a name ("max_depth", "facts_of") is no subscript.
+    const symbols=(unitless.replace(/(?<=[\p{L}\p{N}])_(?=[\p{L}\p{N}])/gu,'').match(/[∑∏∫√≈≠≤≥∞∂∇=^_α-ωΑ-Ω\u0300-\u036f]/gu)||[]).length+mathSpans(text).reduce((n,s)=>n+s.text.length,0);
     // A real paragraph (8+ words) is translated with its inline math and the
     // odd unknown glyph ("error �k,r ∼ GP(0, …)"); the translation copies
     // those tokens. Only a near-formula or unreliable extraction keeps the source.
@@ -227,6 +265,10 @@
     const indexFree=block.rich&&!/^\s*(?:where|with|and|for|then|if|when|since|which|so|thus|hence|here|or|let|\p{Lu}?\p{Ll}{4,})\b/iu.test(proseText)&&repairGlyphs(String(block.rich).replace(/<(sub|sup)>[^<\s]{1,12}<\/\1>/g,' ').replace(/<\/?su[bp]>/g,' ')).replace(brace,' ').replace(/z?(?:ffl){2,}[}|{]*/g,' ');
     const prose=proseLike(proseText)&&(!indexFree||proseLike(indexFree));
     if(prose)return false;
+    // A sentence with a plain relation in it (sentenceLine) is prose; drawn, numbered and LaTeX equations (also one
+    // whose number stands at the margin on its row: equationNumber, from paragraphs()), and text whose glyphs did not
+    // extract, keep the rules below.
+    if(!drawn&&!numbered&&!block.equationNumber&&!braces&&!spans.length&&!/[\uFFFD\u0000-\u0008ðþÞ∑∏∫√]/u.test(text)&&sentenceLine(indexFree||proseText))return false;
     if(braces)return true;
     if(spans.length&&proseText.replace(/[\s\d()[\].,:;+-]/g,'')==='')return true;
     if(spans.length&&words.length)return false;
@@ -411,7 +453,10 @@
       // allowance when space exists, without entering the next text region.
       const next=blocks.filter(n=>n!==b&&n.y>=b.y+b.height-1&&n.x<b.x+b.width&&n.x+n.width>b.x).reduce((y,n)=>Math.min(y,n.y),page.height||Infinity);
       const height=sourceOnly?b.height:Math.max(b.height,Math.min(b.height+b.fontSize*.3,next-b.y));
-      return {...b,height,sourceOnly,preserveSource:Boolean(b.preserveSource||!sourceOnly&&(b.inlineGraphic&&!graphicSpans(b.text).length||mathDense(String(b.text).replace(GRAPHIC," "))))};
+      // A few words with a symbol or a plain relation ("Φ at point 6", "(10 < α + β, α < 3): their conjunction is Φ")
+      // read as well translated in place: the symbols are copied as they are. With sub- or superscripts the source stays.
+      const plain=!/<su[bp]>/.test(String(b.rich||''))&&lightMath(String(b.text).replace(GRAPHIC," "));
+      return {...b,height,sourceOnly,preserveSource:Boolean(b.preserveSource||!sourceOnly&&(b.inlineGraphic&&!graphicSpans(b.text).length||!plain&&mathDense(String(b.text).replace(GRAPHIC," "))))};
     });
     // Raised superscripts or deep descenders can make neighbouring boxes
     // overlap by a few pixels. Trim the upper box at the lower box's top
@@ -1082,8 +1127,17 @@
   // line opens the next entry (author-year references, bullet items).
   // An author–year reference: "Surname, X., …, 2021." or "Eigenvector, 2022.".
   const authorYear=t=>/^\p{Lu}[\p{L}'’ -]{1,40},\s*(?:\p{Lu}\.|(?:1[89]|20)\d{2})/u.test(String(t))&&/\b(?:1[89]|20)\d{2}[a-z]?\b/.test(String(t));
+  // In a listing of code each comment and each docstring is a line of its own: a line that opens with a comment
+  // mark ("# conjuncts of the path condition", "// here") starts a block and takes no line after it, and a
+  // docstring closed on its line ("""One fresh symbol per parameter.""") ends there. Read on into one paragraph,
+  // the comments of three lines and the code under a docstring were translated as one text and lost their lines.
+  // "# Test", "# params." head a table's column (a count) and "//neurips.cc/…" goes on an address: a comment is a
+  // mark, a space and three words or more, with no second mark.
+  const commentLine=text=>{const m=/^\s*(?:#|\/\/)\s+([^#]*)$/.exec(String(text));return Boolean(m)&&!/\/\//.test(m[1])&&(m[1].match(/[\p{L}\p{N}_]+/gu)||[]).length>=3;};
+  const docstringLine=text=>/^\s*(?:"""|''')/.test(String(text))||/(?:"""|''')\s*$/.test(String(text));
   function paragraphStart(b,line){
     const prev=b.lines?.at(-1);
+    if(prev&&(commentLine(line.text)||commentLine(prev.text)||docstringLine(line.text)&&!docstringLine(prev.text)||/\S.*(?:"""|''')\s*$/.test(String(prev.text))))return true;
     // One-line entries in a row ("Vaswani, A., …, 2017. … 30." / "Wang, Q., …").
     if(b.lines?.length===1&&authorYear(prev.text)&&authorYear(line.text)&&/[.]["'”’)\]]*$/.test(String(prev.text).trim())&&Math.abs(line.x-prev.x)<=line.fontSize*.5)return true;
     if(!prev||b.lines.length<2)return false;
@@ -1211,7 +1265,9 @@
     const blocks=[];
     for(const line of [...lines].sort((a,b)=>a.y-b.y||a.x-b.x)){
       // Classify the repaired text: a mis-encoded "ð…Þ" line is prose, not a formula.
-      const math=formulaOnly({...line,text:repairGlyphs(line.text)});
+      // An equation's number set at the margin on its baseline ("… + higher order terms.     (12)") is a line of its own here.
+      const equationNumber=lines.some(o=>o!==line&&/^\s*\(\d{1,3}[a-z]?\)\s*$/.test(o.text)&&o.x>line.x+line.width&&Math.abs((o.baseline??o.y)-(line.baseline??line.y))<line.fontSize*.6);
+      const math=formulaOnly({...line,text:repairGlyphs(line.text),equationNumber});
       const heading=headingLine(line,median,body)&&!(abstractLine&&line.y<abstractLine.y&&line.fontSize<abstractLine.fontSize);
       // A bold "Label:" opens a new metadata field (Citation:, Received: …),
       // and a bold run-in heading ("Bayesian inference.") a new paragraph.
@@ -1240,7 +1296,28 @@
         const row=lines.filter(o=>Math.abs((o.baseline??o.y)-(line.baseline??line.y))<line.fontSize*.3&&o.x<b.x+b.width&&o.x+o.width>b.x).sort((p,q)=>p.x-q.x);
         return row.some((o,i)=>i&&o.x-(row[i-1].x+row[i-1].width)>=line.fontSize*3);
       };
-      const paragraph=!field&&!runIn&&blocks.slice().reverse().find(b=>!paragraphStart(b,line)&&!listItemStart(b,line)&&!tableRow(b)&&(!heading&&!b.heading||runsOn(b)||heading&&b.heading&&line.fontSize>median*1.45)&&(!math||finishes(b))&&!b.formulaLike&&(Math.abs(b.x-line.x)<Math.max(12,line.fontSize*1.3)||hangingLine(b,line)||indentedFirst(b,line)||besideCap(b,line))&&Math.abs(b.fontSize-line.fontSize)<line.fontSize*.12&&(line.baseline??line.y)-(b.lastBaseline??b.y)>line.fontSize*.55&&(line.baseline??line.y)-(b.lastBaseline??b.y)<line.fontSize*1.7&&b.text.length+line.text.length<10000);
+      // Cells under a table's head are no lines of that head. The head is one line so far; the line under it is one
+      // short word a table row's height below (a line and a half: text lines are set closer) with another cell on its
+      // row inside the head's width ("the state at point 6 of the execution tree" / "node | 6" / "env | x ↦ α, …"),
+      // or holds no word at all, is a sliver of the head's width and has
+      // such a cell beside it ("runs that reach r = 1" / "x   y" / "−1   100").
+      const beside=test=>b=>lines.some(o=>o!==line&&test(o)&&Math.abs((o.baseline??o.y)-(line.baseline??line.y))<line.fontSize*.3&&o.x<b.x+b.width&&o.x+o.width>b.x);
+      const bare=l=>!/\p{L}{2,}/u.test(l.text)&&!/[.?!,;:]["'”’)\]]*\s*$/.test(l.text);
+      // Two rows of a table, one under the other ("f returns | 0 | 1 | 2" over "an input (x, y) | (10, 0) | (2, 9) |
+      // none: …"), are no paragraph of two lines: each holds words and has two short cells or more to its right on its
+      // row, and they stand a table row's height apart (a line and a half; tables set tight keep being read by column).
+      const cells=l=>lines.filter(o=>o!==l&&o.x>=l.x+l.width+l.fontSize&&o.width<=l.fontSize*6&&Math.abs((o.baseline??o.y)-(l.baseline??l.y))<l.fontSize*.3).length;
+      const rows=b=>b.lines.length===1&&/\p{L}{2,}/u.test(line.text)&&/\p{L}{2,}/u.test(b.text)&&(line.baseline??line.y)-(b.lastBaseline??b.y)>=line.fontSize*1.5&&cells(line)>=2&&cells(b.lines[0])>=2;
+      const cell=b=>rows(b)||b.lines.length===1&&(bare(line)&&line.width<b.width*.15&&sentenceLine(b.text)&&formulaLike(b.text)&&beside(bare)(b)||line.width<b.width*.35&&/^\s*\S{1,12}\s*$/.test(line.text)&&(line.baseline??line.y)-(b.lastBaseline??b.y)>=line.fontSize*1.5&&String(b.text).trim().length>=30&&!/[,;:-]\s*$/.test(b.text)&&beside(o=>o.x>=line.x+line.width+line.fontSize)(b));
+      // A sentence set centred over two or more lines ("… three inputs, one per path," / "and a proof that r = 2
+      // never runs."): the lines share their middle (each edge moves in by the same two ems or more; a first-line
+      // indent moves one edge only); the line above is a line of text (thirty characters: stacked cells of a table
+      // are shorter), does not end the sentence, and this one goes on in lower case.
+      // Translated apart, each half took its own size.
+      const centred=b=>{const last=b.lines.at(-1),left=line.x-last.x,right=last.x+last.width-(line.x+line.width);return Math.abs(left-right)<=line.fontSize*.5&&Math.abs(left)>=line.fontSize*2&&!/[.?!:;]["'”’)\]]*\s*$/.test(last.text)&&/^\s*\p{Ll}{2,}/u.test(line.text)&&!/@|:\/\/|^\s*www\./.test(line.text)&&String(last.text).trim().length>=30;};
+      const joins=aligned=>b=>!paragraphStart(b,line)&&!listItemStart(b,line)&&!tableRow(b)&&!cell(b)&&(!heading&&!b.heading||runsOn(b)||heading&&b.heading&&line.fontSize>median*1.45)&&(!math||finishes(b))&&!b.formulaLike&&aligned(b)&&Math.abs(b.fontSize-line.fontSize)<line.fontSize*.12&&(line.baseline??line.y)-(b.lastBaseline??b.y)>line.fontSize*.55&&(line.baseline??line.y)-(b.lastBaseline??b.y)<line.fontSize*1.7&&b.text.length+line.text.length<10000;
+      // The usual alignment first; a centred continuation only when no block takes the line that way.
+      const paragraph=!field&&!runIn&&(blocks.slice().reverse().find(joins(b=>Math.abs(b.x-line.x)<Math.max(12,line.fontSize*1.3)||hangingLine(b,line)||indentedFirst(b,line)||besideCap(b,line)))||blocks.slice().reverse().find(joins(centred)));
       if(paragraph){if(runsOn(paragraph)&&!title(paragraph)&&line.width>=paragraph.width*.6)paragraph.heading=false;paragraph.text+='\n'+line.text;paragraph.rich+='\n'+(line.rich||line.text);const right=Math.max(paragraph.x+paragraph.width,line.x+line.width);paragraph.x=Math.min(paragraph.x,line.x);paragraph.width=right-paragraph.x;paragraph.height=Math.max(paragraph.bottom,line.y+line.height)-paragraph.y;paragraph.bottom=paragraph.y+paragraph.height;paragraph.lastBaseline=line.baseline??line.y;paragraph.lines.push(line);}
       else blocks.push({...line,rich:line.rich||line.text,bottom:line.y+line.height,lastBaseline:line.baseline??line.y,formulaLike:math,heading,label:field?'field':runIn?'runin':false,lines:[line]});
     }
@@ -1647,7 +1724,10 @@
       const body=n.kind==='body'&&!formulaOnly(n);
       if(body&&last&&last.sectionId===n.sectionId){
         const a=last,end=String(a.text).trim(),start=String(n.text).trim(),size=Math.max(a.fontSize,n.fontSize);
-        const broken=n.page>a.page||n.x>a.x+a.width*.5||n.x+n.width<a.x+a.width*.5||n.y<a.y||n.y-(a.y+a.height)>a.fontSize*2;
+        // A block under the paragraph's left half is its column going on, or its last words; not a sliver of its
+        // width that ends no sentence: the first cells of a table under its head ("the state at point 6 of the
+        // execution tree" / "node env pc").
+        const broken=n.page>a.page||n.x>a.x+a.width*.5||n.x+n.width<a.x+a.width*.5&&!(n.page===a.page&&n.y>a.y&&n.width<a.width*.2&&!terminal(start))||n.y<a.y||n.y-(a.y+a.height)>a.fontSize*2;
         // Back up the same page is the next column only when it lies beside the paragraph: a slide's
         // label above a page-wide line ("learn a score, …" over "… for example MCMC") is not its end.
         if(n.page===a.page&&n.y<a.y&&n.x<a.x+a.width-a.fontSize*2){last=body?n:null;continue;}
@@ -1965,6 +2045,6 @@
       return language?trIn(language,'번역 응답을 확인하지 못한 문단입니다({reason}). 이 페이지를 다시 번역하세요.',{reason}):tr('번역 응답을 확인하지 못한 문단입니다({reason}). 이 페이지를 다시 번역하세요.',{reason});}
     return t;
   }
-  const api={warningText,collisionHoles,holeFloats,holeClip,bibliographyEntry,ocrRuns,GRAPHIC,graphicToken,graphicSpans,TAIL_FIT,HARD_FIT,tableCellIds,escapeHtml,splitPoints,scriptTokens,plainScripts,richHtml,scriptCut,repairMath,hangingLine,listItemStart,paragraphStart,runInHeading,repairPages,repairGlyphs,markSame,sameAsSource,maskPads,settleMasks,citationIndex,citationsIn,resolveCitation,figureTop,MIN_FIT_LINE,emphasis,flowChains,splitShares,applyFlow,figureLabelIds,mathDense,MIN_FIT,fitScale,paragraphStyle,fieldLabel,mathSpans,publisherMark,sectionHeading,structureTranslationPages,translationFontSize,expandLayoutBlocks,backgroundColor,backgroundSample,formulaLike,layoutBlocks,columnGutters,textLines,paragraphs,reconcilePage,sectionDocument,sourceKey,layoutCollisions,normalizeParagraph,formulaOnly,typography,typographyRole,pageTypography,typographyCss};
+  const api={warningText,collisionHoles,holeFloats,holeClip,bibliographyEntry,ocrRuns,GRAPHIC,graphicToken,graphicSpans,TAIL_FIT,HARD_FIT,tableCellIds,escapeHtml,splitPoints,scriptTokens,plainScripts,richHtml,scriptCut,repairMath,hangingLine,listItemStart,paragraphStart,runInHeading,repairPages,repairGlyphs,markSame,sameAsSource,maskPads,settleMasks,citationIndex,citationsIn,resolveCitation,figureTop,MIN_FIT_LINE,emphasis,flowChains,splitShares,applyFlow,figureLabelIds,mathDense,sentenceLine,lightMath,MIN_FIT,fitScale,paragraphStyle,fieldLabel,mathSpans,publisherMark,sectionHeading,structureTranslationPages,translationFontSize,expandLayoutBlocks,backgroundColor,backgroundSample,formulaLike,layoutBlocks,columnGutters,textLines,paragraphs,reconcilePage,sectionDocument,sourceKey,layoutCollisions,normalizeParagraph,formulaOnly,typography,typographyRole,pageTypography,typographyCss};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.appPdfLayout=api;
 })(globalThis);

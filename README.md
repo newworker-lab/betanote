@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.2" src="https://img.shields.io/badge/version-1.1.2-1b64da">
+  <img alt="버전 1.1.3" src="https://img.shields.io/badge/version-1.1.3-1b64da">
   <img alt="Windows · Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">
@@ -278,7 +278,7 @@
   - 번역이나 AI 기능을 쓸 때, 그 논문의 해당 부분이 **내가 연결한 AI 서비스**로 갑니다. 로컬 모델을 쓰면 나가지 않습니다.
   - 스캔한 쪽을 번역하거나 그림 설명을 요청할 때는 글자와 함께 **그 쪽이나 그림의 이미지**도 같은 AI 서비스로 갑니다.
   - `자동 채우기`를 쓸 때, DOI 또는 제목과 첫 저자가 서지 조회 서비스(Crossref · DataCite)로 갑니다.
-  - 새 버전이 나왔는지 알리려고, 시작할 때 하루에 한 번까지 GitHub의 공개 릴리스 정보를 읽습니다. 자료나 사용 기록은 보내지 않고, 설정 → 일반에서 끌 수 있습니다. 새 버전은 알리기만 하고 설치하지 않습니다.
+  - 새 버전이 나왔는지 알리려고, 앱을 켤 때와 켜 둔 동안 6시간마다 GitHub의 공개 릴리스 정보를 읽습니다(설정 → 일반의 `지금 확인`으로 바로 확인). 자료나 사용 기록은 보내지 않고, 설정 → 일반에서 끌 수 있습니다. 새 버전은 알리기만 하고 설치하지 않습니다.
 - **보내지 않는 것**: 사용 기록, 오류 보고, 통계. 앱은 어디에도 자동으로 보내지 않습니다. 오류 기록은 PC에만 남고, 도움말 → 진단 정보 복사로 직접 복사했을 때만 밖으로 나갑니다. 그 기록에는 논문 내용, 메모, 파일 경로, 키를 넣지 않습니다.
 - 계정 가입이 없습니다.
 

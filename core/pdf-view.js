@@ -646,25 +646,16 @@ export async function paint(container,record,id,paperId,onVisible=()=>{},onPaint
     const missing=plan.blocks.filter(b=>b.untranslated||b.englishOnly).length;
     const retained=plan.blocks.filter(b=>!b.sourceOnly&&b.preserveSource).length;
     const overflow=plan.blocks.filter(b=>b.clipped).length;
-    if(retained||overflow||missing){
-      const notice=document.createElement('button');notice.type='button';notice.className='layout-reading-notice';
-      // Name why text left the page so a report can point at the exact rule.
-      const reasons={};for(const b of plan.blocks.filter(b=>!b.sourceOnly&&(b.preserveSource||b.clipped)))reasons[b.reason]=(reasons[b.reason]||0)+1;
+    // What left the page is kept on the layer for tests and reports, not shown over the page: a notice there covered the
+    // text (a kept paragraph shows its translation when pointed at; pages to translate again are listed in 번역 결과 상태).
+    {const reasons={};for(const b of plan.blocks.filter(b=>!b.sourceOnly&&(b.preserveSource||b.clipped)))reasons[b.reason]=(reasons[b.reason]||0)+1;
       const english=plan.blocks.filter(b=>b.englishOnly).length;if(english)reasons.english=english;
-      const labels={overflow:tr('넘침'),math:tr('수식',null,'reason'),background:tr('배경'),overlap:tr('겹침'),mapping:tr('문단 대응'),untranslated:tr('미번역'),english:tr('영문 응답')};
-      notice.dataset.reasons=Object.keys(reasons).join(' ');
-      // The reason is on the button itself so a screenshot shows the rule.
-      const why=Object.entries(reasons).map(([k,n])=>`${labels[k]||k} ${n}`).join(', ');
-      // Untranslated paragraphs say why the reply was not accepted.
-      const missingCounts={};for(const b of plan.blocks.filter(b=>b.untranslated&&b.missingReason))missingCounts[b.missingReason]=(missingCounts[b.missingReason]||0)+1;
-      const missingLabels={missing:tr('응답 누락'),english:tr('영문 응답'),math:tr('수식 표시 누락'),format:tr('응답 형식 오류')},missingWhy=Object.entries(missingCounts).map(([k,n])=>`${missingLabels[k]||k} ${n}`).join(', ');
-      notice.textContent=[missing?(missingWhy?tr('미번역 {n}개({why})',{n:missing,why:missingWhy}):tr('미번역 {n}개',{n:missing})):'',retained?tr('원문 유지 {n}개 (문단에 마우스를 올리면 번역)',{n:retained}):'',overflow?tr('칸보다 긴 번역 {n}개 (마우스를 올리면 전체)',{n:overflow}):'',why?tr('사유: {why}',{why}):'',reasons.mapping?tr('이 페이지를 다시 번역하면 맞춰집니다'):'',tr('전체 번역 보기')].filter(Boolean).join(' · ');
-      // Name why text left the page first, then how to read it.
-      notice.title=tr('사유: {why}',{why:Object.entries(reasons).map(([k,n])=>`${labels[k]||k} ${n}`).join(', ')})+'\n'+tr('원문으로 둔 문단은 그 문단에 마우스를 올리거나 Tab으로 고르면 번역이 옆에 열립니다. 섹션 보기에서는 제목별로 전체 번역을 표시합니다. 미번역 문단은 해당 페이지를 다시 번역하세요.');
-      notice.addEventListener('click',()=>container.closest('.pdf-pane')?.querySelector('[data-action="toggle-translation-reading"]')?.click());layer.append(notice);
-    }
+      Object.assign(layer.dataset,{missing:String(missing),retained:String(retained),overflow:String(overflow),reasons:Object.entries(reasons).map(([k,n])=>`${k}:${n}`).join(' ')});}
     layer.dataset.ready='true';controller.plans.set(index,plan);
-    const retry=document.createElement('button');retry.className='secondary small page-retranslate';retry.dataset.retranslatePage=index+1;retry.textContent=tr('이 페이지 다시 번역');retry.disabled=Boolean(record.partial);layer.append(retry);onPaint(index+1);
+    const retry=document.createElement('button');retry.className='secondary small page-retranslate';retry.type='button';retry.dataset.retranslatePage=index+1;retry.textContent=tr('이 페이지 다시 번역');retry.disabled=Boolean(record.partial);
+    // On the page itself, not in the layer: the layer is scaled to the page's width, and a small page (a slide) shown
+    // large made the button large with it. Here it is the same size on the screen whatever the page's size or zoom.
+    for(const previous of pageView.div.querySelectorAll(':scope>.page-retranslate'))previous.remove();pageView.div.append(retry);onPaint(index+1);
   }
   controller.onPage=(pageView,index)=>draw(pageView,index).catch(error=>{if(valid())console.error(error);});
   for(let i=0;i<controller.viewer.pagesCount;i++){const view=controller.viewer.getPageView(i);if(view.canvas)await draw(view,i);}

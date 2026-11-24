@@ -1,7 +1,10 @@
 // End-to-end check of the new-version notice (desktop/update-check.cjs, main.cjs checkForUpdate, help.js): with a
 // newer release in the feed the start screen says so, with the running version beside it; 내려받기 opens the release
-// page in the browser; 이 버전 건너뛰기 is kept and that version is not offered again; a release that is not newer, a
-// feed that cannot be reached and a check switched off in the settings show nothing, and switched off nothing is asked.
+// page in the browser; started again soon after, the feed is not asked but the release found is told again; half an
+// hour later it is asked again; 이 버전 건너뛰기 is kept and that version is not offered again; 지금 확인 in the
+// settings asks at once and says when the running version is the latest; while the app stays open it asks again and
+// tells a release out since; a release that is not newer, a feed that cannot be reached and a check switched off in
+// the settings show nothing, and switched off nothing is asked.
 // The feed is a server of this test (APP_UPDATE_FEED): GitHub is not asked. APP_TEST_SOURCE=1 runs the source.
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
@@ -41,11 +44,11 @@ const current = require('../package.json').version;
     await notice(p).locator('[data-action="update-open"]').click(); await notice(p).waitFor({ state: 'hidden' });
     assert.deepEqual(await app.evaluate(() => globalThis.opened), [page('99.1.0')]);
     await app.close(); app = null;
-    // The same day: not asked again.
-    p = await launch(profile); await p.waitForTimeout(800); assert.equal(asked, 1, 'asked once a day at most'); assert.equal(await notice(p).count(), 0);
+    // Started again soon after: the feed is not asked again, and the release found is told again (it was not skipped).
+    p = await launch(profile); await notice(p).waitFor(); assert.equal(asked, 1, 'not asked again within half an hour'); assert.match(await notice(p).textContent(), /99\.1\.0/);
     await app.close(); app = null;
-    // A day later: told again; 이 버전 건너뛰기 is kept.
-    const aDayAgo = async () => { const s = await settingsOf(profile); s.updateCheckedAt = Date.now() - 25 * 60 * 60 * 1000; await fs.writeFile(path.join(profile, 'settings.json'), JSON.stringify(s)); };
+    // Half an hour later: asked again; 이 버전 건너뛰기 is kept.
+    const aDayAgo = async () => { const s = await settingsOf(profile); s.updateCheckedAt = Date.now() - 31 * 60 * 1000; await fs.writeFile(path.join(profile, 'settings.json'), JSON.stringify(s)); };
     await aDayAgo(); p = await launch(profile); await notice(p).waitFor(); assert.equal(asked, 2);
     await notice(p).locator('[data-action="update-skip"]').click(); await notice(p).waitFor({ state: 'hidden' });
     for (let i = 0; i < 50 && (await settingsOf(profile)).updateSkipped !== '99.1.0'; i++) await new Promise(r => setTimeout(r, 100));
@@ -57,8 +60,22 @@ const current = require('../package.json').version;
     await app.close(); app = null;
     await aDayAgo(); answer = { tag_name: 'v99.2.0', html_url: page('99.2.0') }; p = await launch(profile); await notice(p).waitFor(); assert.match(await notice(p).textContent(), /99\.2\.0/);
     await notice(p).locator('[data-action="close"]').first().click();
+    // 지금 확인 in the settings asks at once: a newer release is told (also one put off a moment ago); with the running
+    // version the latest, it says so.
+    const general = async () => { await p.evaluate(() => actions.settings()); await p.locator('#dialog[open] [data-llm-section="general"] summary').click(); };
+    let was = asked; await general(); await p.locator('#dialog[open] [data-action="update-check-now"]').click(); await notice(p).waitFor();
+    assert.equal(asked, was + 1, '지금 확인 asks'); assert.match(await notice(p).textContent(), /99\.2\.0/); await notice(p).locator('[data-action="close"]').first().click();
+    answer = { tag_name: 'v' + current, html_url: page(current) }; was = asked; await general(); await p.locator('#dialog[open] [data-action="update-check-now"]').click();
+    await p.locator('#toast.show').filter({ hasText: current }).waitFor(); assert.match(await p.locator('#toast').textContent(), /최신 버전/); assert.equal(asked, was + 1);
+    await p.evaluate(() => dialog.close());
+    await app.close(); app = null;
+    // While the app stays open it asks again (here every 1.5 s) and tells a release out since.
+    answer = { tag_name: 'v' + current, html_url: page(current) }; await aDayAgo(); was = asked; p = await launch(profile, { APP_UPDATE_EVERY_MS: '1500' });
+    for (let i = 0; i < 50 && asked === was; i++) await new Promise(r => setTimeout(r, 100)); assert.equal(await notice(p).count(), 0, 'the latest is running: nothing told');
+    answer = { tag_name: 'v99.3.0', html_url: page('99.3.0') }; await notice(p).waitFor(); assert.match(await notice(p).textContent(), /99\.3\.0/); assert.ok(asked >= was + 2, 'asked again while open');
+    await notice(p).locator('[data-action="close"]').first().click();
     // Switched off in the settings: kept, and nothing is asked at the next start.
-    await p.evaluate(() => actions.settings()); await p.locator('#dialog[open] [data-llm-section="general"] summary').click(); // the start screen has no sidebar: the settings are opened as the menu does
+    await general(); // the start screen has no sidebar: the settings are opened as the menu does
     const box = p.locator('#kn-update'); assert.equal(await box.isChecked(), true); await box.uncheck();
     for (let i = 0; i < 50 && (await settingsOf(profile)).features?.updateCheck !== false; i++) await new Promise(r => setTimeout(r, 100));
     assert.equal((await settingsOf(profile)).features.updateCheck, false);
@@ -74,7 +91,7 @@ const current = require('../package.json').version;
     }
     // APP_UPDATE_FEED=off (what every other smoke runs with): nothing is asked.
     { const was = asked; p = await launch(path.join(temp, 'off'), { APP_UPDATE_FEED: 'off' }); await p.waitForTimeout(800); assert.equal(asked, was); await app.close(); app = null; }
-    console.log('Update smoke passed: a newer release is told with both versions; 내려받기 opens the release page; asked once a day at most; a skipped version is not offered again and a newer one is; switched off in the settings nothing is asked; a release that is not newer, a pre-release, a page elsewhere and a failing feed show nothing.');
+    console.log('Update smoke passed: a newer release is told with both versions; 내려받기 opens the release page; not asked again within half an hour but told again, asked half an hour later; a skipped version is not offered again and a newer one is; 지금 확인 asks at once and names the latest; asked again while open; switched off in the settings nothing is asked; a release that is not newer, a pre-release, a page elsewhere and a failing feed show nothing.');
   } catch (error) { console.error(error); process.exitCode = 1; try { await (await app?.firstWindow())?.screenshot({ path: path.join(os.tmpdir(), `${appName.id}-update-failure.png`) }); } catch { /* no window to picture */ } }
   finally { await app?.close().catch(() => {}); server.close(); await fs.rm(temp, { recursive: true, force: true }); }
 })();

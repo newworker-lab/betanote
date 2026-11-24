@@ -2,7 +2,7 @@
 // how often it is asked, and when a notice is due.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseVersion, isNewer, releaseFeed, latestRelease, due, noticeFor } = require('../desktop/update-check.cjs');
+const { parseVersion, isNewer, releaseFeed, latestRelease, due, noticeFor, UPDATE_EVERY, storedRelease } = require('../desktop/update-check.cjs');
 
 test('versions are three numbers, with or without a v; anything else is no version', () => {
   assert.deepEqual(parseVersion('v1.2.3'), [1, 2, 3]); assert.deepEqual(parseVersion('1.10.0'), [1, 10, 0]);
@@ -34,11 +34,20 @@ test('the latest release is read from the answer; drafts, pre-releases, odd addr
   const never = (_url, options) => new Promise((_resolve, reject) => { options.signal.addEventListener('abort', () => reject(Error('aborted'))); });
   assert.equal(await latestRelease({ fetch: never, feed: 'x', timeoutMs: 20 }), null);
 });
-test('it is asked once a day at most', () => {
-  const day = 24 * 60 * 60 * 1000, now = 10 * day;
-  assert.equal(due(undefined, now), true); assert.equal(due(0, now), true); assert.equal(due(now - day - 1, now), true);
-  assert.equal(due(now - day + 1000, now), false); assert.equal(due(now + 5 * day, now), true, 'a time in the future (a clock set back) does not stop the check');
-  assert.equal(due('yesterday', now), true);
+test('it is asked at each start (not again within half an hour) and every six hours while the app is open', () => {
+  const minute = 60 * 1000, hour = 60 * minute, now = 1000 * hour;
+  assert.equal(UPDATE_EVERY.start, 30 * minute); assert.equal(UPDATE_EVERY.open, 6 * hour);
+  assert.equal(due(undefined, now, UPDATE_EVERY.start), true); assert.equal(due(0, now, UPDATE_EVERY.start), true);
+  assert.equal(due(now - 31 * minute, now, UPDATE_EVERY.start), true, 'a start half an hour after the last check asks (a release out since is found)');
+  assert.equal(due(now - 10 * minute, now, UPDATE_EVERY.start), false, 'a few restarts ask once');
+  assert.equal(due(now - 5 * hour, now, UPDATE_EVERY.open), false); assert.equal(due(now - 6 * hour - 1, now, UPDATE_EVERY.open), true);
+  assert.equal(due(now + 5 * hour, now, UPDATE_EVERY.start), true, 'a time in the future (a clock set back) does not stop the check');
+  assert.equal(due('yesterday', now, UPDATE_EVERY.start), true);
+});
+test('the newest release found is kept as checked; anything else read back from the settings is none', () => {
+  const release = { version: '1.2.0', url: 'https://github.com/o/r/releases/tag/v1.2.0' };
+  assert.deepEqual(storedRelease(release), release); assert.deepEqual(storedRelease({ ...release, extra: 1 }), release);
+  for (const bad of [null, undefined, 'v1.2.0', [], { version: 'v1.2', url: release.url }, { version: '1.2.0', url: 'https://example.com/x' }, { version: '1.2.0' }, { version: '1.2.0', url: 'https://github.com/' + 'a'.repeat(300) }]) assert.equal(storedRelease(bad), null, JSON.stringify(bad));
 });
 test('a notice is due for a newer release that was not skipped', () => {
   const release = { version: '1.2.0', url: 'https://github.com/o/r/releases/tag/v1.2.0' };

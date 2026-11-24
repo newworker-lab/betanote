@@ -150,18 +150,31 @@ function fixturePdf(){
   assert.equal(await p.locator('.layout-flow-continuation').count(),0);assert.equal(await overflow.evaluate(n=>n.classList.contains('source-preserved')),false);
   assert.equal(await overflow.locator('.translation-content').evaluate(n=>getComputedStyle(n).overflowY),'hidden');
   assert.equal(await overflow.evaluate(n=>Math.round(parseFloat(n.style.height))===Math.round(n.getBoundingClientRect().height/(n.closest('.translation-layer').getBoundingClientRect().width/Number(n.closest('.translation-layer').dataset.sourceWidth)))),true,'the box keeps its size');
-  await overflow.hover();await p.mouse.move(...await overflow.boundingBox().then(box=>[box.x+box.width/2+3,box.y+box.height/2+2]));const panel=p.locator('.translation-note-pop');await panel.waitFor();assert.match(await panel.textContent(),/TRANSLATION_END$/);
+  // The panel opens when the paragraph is pointed at; a pointer event lost while the page settles is given again.
+  const panel=p.locator('.translation-note-pop');
+  for(let i=0;i<5;i++){await overflow.hover();await p.mouse.move(...await overflow.boundingBox().then(box=>[box.x+box.width/2+3,box.y+box.height/2+2]));if(await panel.waitFor({timeout:3000}).then(()=>true,()=>false))break;await p.mouse.move(2,2);await p.waitForTimeout(300);}
+  await panel.waitFor();assert.match(await panel.textContent(),/TRANSLATION_END$/);
   assert.equal(await panel.evaluate(n=>{const b=n.getBoundingClientRect();return b.left>=0&&b.top>=0&&b.right<=innerWidth&&b.bottom<=innerHeight;}),true);
   // No browser tooltip over the note: no paragraph of the translated page, nor what is around or in it, has a title (a
   // paragraph's warnings once went there and covered the panel).
   assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('.translated-block')].flatMap(b=>{const out=[];for(let e=b;e&&!e.classList.contains('translated-sheet');e=e.parentElement)if(e.title)out.push(e.className+': '+e.title);for(const e of b.querySelectorAll('[title]'))if(e.title)out.push(e.className+': '+e.title);return out;})),[],'no titles on the translated paragraphs');
   assert.ok(await overflow.evaluate(n=>!n.title),'the hovered paragraph has none');await p.mouse.move(2,2);
-  assert.match(await p.locator('.translated-sheet[data-page="1"] .layout-reading-notice').textContent(),/칸보다 긴 번역 1개/);
+  // What left the page is kept on the layer; nothing is laid over the page to say so (a notice there covered the text).
+  assert.equal(await p.locator('.translated-sheet[data-page="1"] .translation-layer').getAttribute('data-overflow'),'1');assert.equal(await p.locator('.layout-reading-notice').count(),0);
+  // 이 페이지 다시 번역 is a small mark in the corner until it is pointed at itself.
+  // It is on the page, outside the scaled layer: 22 px on the screen whatever the page's size or zoom.
+  {const retry=p.locator('.translated-sheet[data-page="1"] .page-retranslate'),size=async()=>{const box=await retry.boundingBox();return [Math.round(box.width),Math.round(box.height)];};
+    assert.deepEqual(await size(),[22,22],'a small mark');assert.equal(await retry.evaluate(n=>n.parentElement.classList.contains('translated-sheet')&&!n.closest('.translation-layer')),true);
+    const scale=()=>p.evaluate(()=>{const layer=document.querySelector('.translated-sheet[data-page="1"] .translation-layer');return layer?.dataset.ready==='true'?new DOMMatrix(getComputedStyle(layer).transform).a:0;}),before=await scale();
+    const zoomTo=async(step,test)=>{await p.evaluate(step=>document.querySelector(`.translated-pane [data-reader-zoom="${step}"]`).click(),step);for(let i=0;i<100&&!test(await scale());i++)await p.waitForTimeout(100);await retry.waitFor();};
+    await zoomTo('.1',now=>now>before+.01);assert.ok(await scale()>before,'the page is shown larger');
+    assert.deepEqual(await size(),[22,22],'the same size when the page is shown larger');await zoomTo('-.1',now=>now&&Math.abs(now-before)<.001);
+    await retry.hover();assert.ok((await retry.boundingBox()).width>60,'opens into the button when pointed at');await p.mouse.move(2,2);}
   // Cross the next physical page with real wheel input in both directions.
   await p.evaluate(()=>{const c=document.querySelector('.translated-pane .translated-pages');c.scrollTop=pageTop(c,c.querySelector('.translated-sheet[data-page="2"]'))-180;});
   await p.waitForTimeout(200);
   await wheelAcrossPages('.translated-pane .translated-pages');
-  await p.locator('.layout-reading-notice').filter({hasText:'전체 번역 보기'}).first().click();
+  await (await toolShown(p, '.translated-pane [data-action="toggle-translation-reading"]')).click();
   const full=p.locator('.section-paragraph').filter({hasText:'TRANSLATION_END'});await full.waitFor();
   assert.equal(await p.locator('.translated-pane .block-expand').count(),0);
   assert.equal(await full.evaluate(n=>n.scrollHeight<=n.clientHeight+1&&getComputedStyle(n).position==='static'),true);

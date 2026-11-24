@@ -182,6 +182,7 @@ contextBridge.exposeInMainWorld('appApi', {
   pendingUpdate: () => ipcRenderer.invoke('update-pending'),
   openUpdate: () => ipcRenderer.invoke('update-open'),
   skipUpdate: () => ipcRenderer.invoke('update-skip'),
+  checkUpdateNow: () => ipcRenderer.invoke('update-check-now'),
   onUpdateAvailable: callback => { ipcRenderer.on('update-available', (_event, info) => callback(info)); },
   onVaultFilesChanged: callback => { ipcRenderer.on('vault-files-changed', (_event, id) => callback(id)); },
   revealOriginal: (id, paperId) => ipcRenderer.invoke('reveal-original', id, paperId)
