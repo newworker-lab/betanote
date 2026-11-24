@@ -8,7 +8,7 @@ const appName = require('../core/app-name.cjs');
 const crypto = require('node:crypto');
 const { atomicJson, readJson, KeyedQueue } = require('./storage.cjs');
 const { VAULT_DIR } = require('./legacy.cjs');
-const { joinLineBoxes, highlightBoxes, validTextLook, cleanTextLook, hexColor, textLook, textBoxFrame, textBorderDash } = require('../core/ink-marks.cjs');
+const { joinLineBoxes, highlightBoxes, underlineBoxes, validTextLook, cleanTextLook, hexColor, textLook, textBoxFrame, textBorderDash } = require('../core/ink-marks.cjs');
 const { vaultDirectory } = require('./vault-folder.cjs');
 
 // pen/highlighter: free strokes; text: a page memo at a point; mark: a
@@ -362,9 +362,9 @@ async function inkedOriginal(bytes, ink, marks = { boxes: [], underlines: [] }) 
     const rect = bounds(stroke), color = rgb(stroke.color), highlighter = stroke.tool === 'highlighter';
     // Text highlights become /Highlight with QuadPoints; page memos become /Text notes.
     if (stroke.tool === 'mark' && stroke.style === 'underline') {
-      const bars = stroke.rects.map(underlineBar), fill = bars.map(r => `${num(r[0])} ${num(r[1])} ${num(r[2] - r[0])} ${num(r[3] - r[1])} re`).join('\n');
+      const lines = underlineBoxes(stroke.rects), bars = lines.map(underlineBar), fill = bars.map(r => `${num(r[0])} ${num(r[1])} ${num(r[2] - r[0])} ${num(r[3] - r[1])} re`).join('\n');
       const appearance = context.register(context.stream(`q ${color.map(num).join(' ')} rg\n${fill}\nf Q`, { Type: 'XObject', Subtype: 'Form', BBox: rect }));
-      const annotation = context.obj({ Type: 'Annot', Subtype: 'Underline', Rect: rect, QuadPoints: stroke.rects.flatMap(r => [r[0], r[3], r[2], r[3], r[0], r[1], r[2], r[1]]), C: color, F: 4, AP: { N: appearance } });
+      const annotation = context.obj({ Type: 'Annot', Subtype: 'Underline', Rect: rect, QuadPoints: lines.flatMap(r => [r[0], r[3], r[2], r[3], r[0], r[1], r[2], r[1]]), C: color, F: 4, AP: { N: appearance } });
       if (stroke.quote) annotation.set(PDFName.of('Contents'), PDFHexString.fromText(stroke.quote));
       add(page, annotation, stroke); continue;
     }
@@ -404,7 +404,7 @@ function overlaySvg(ink, index, page) {
   for (const stroke of [...strokes].sort((a, b) => order(a.tool) - order(b.tool))) {
     // Colours read from disk go into the SVG only as '#rrggbb' (core/ink-marks.cjs hexColor, textLook).
     const color = hexColor(stroke.color) || '#000000', highlighter = stroke.tool === 'highlighter';
-    if (stroke.tool === 'mark' && stroke.style === 'underline') { for (const bar of stroke.rects.map(underlineBar)) { const a = apply(transform, bar[0], bar[1]), b = apply(transform, bar[2], bar[3]); paths.push(`<rect x="${num(Math.min(a[0], b[0]))}" y="${num(Math.min(a[1], b[1]))}" width="${num(Math.abs(b[0] - a[0]))}" height="${num(Math.abs(b[1] - a[1]))}" fill="${color}" stroke="none"/>`); } continue; }
+    if (stroke.tool === 'mark' && stroke.style === 'underline') { for (const bar of underlineBoxes(stroke.rects).map(underlineBar)) { const a = apply(transform, bar[0], bar[1]), b = apply(transform, bar[2], bar[3]); paths.push(`<rect x="${num(Math.min(a[0], b[0]))}" y="${num(Math.min(a[1], b[1]))}" width="${num(Math.abs(b[0] - a[0]))}" height="${num(Math.abs(b[1] - a[1]))}" fill="${color}" stroke="none"/>`); } continue; }
     // A highlight is one path of its line boxes, so its translucency is laid once where boxes meet (core/ink-marks.cjs).
     if (stroke.tool === 'mark') {
       const d = highlightBoxes(stroke.rects).map(r => { const a = apply(transform, r[0], r[1]), b = apply(transform, r[2], r[3]), x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]); return `M${num(x)} ${num(y)}h${num(Math.abs(b[0] - a[0]))}v${num(Math.abs(b[1] - a[1]))}h${num(-Math.abs(b[0] - a[0]))}Z`; }).join('');

@@ -400,6 +400,16 @@ test('colours read from disk go into the print only as #rrggbb', () => {
 // A highlight over several lines, as a selection gives it: for every line wholly inside the selection both the line's
 // element box and its text box, and the boxes of neighbouring lines meeting by a fraction of a point.
 const selected = [[71.99, 697.66, 255.96, 711.31], [71.99, 684.84, 275.29, 696.84], [71.99, 684.63, 275.29, 698.28], [71.99, 671.88, 259.96, 683.88], [71.99, 671.67, 259.96, 685.32], [71.99, 658.85, 267.29, 670.85], [71.99, 658.63, 267.29, 672.29], [71.99, 645.68, 255.97, 659.33]];
+test('an underline of several lines is one line under each: the two boxes a selection gives a whole line are one', () => {
+  const { underlineBoxes } = require('../core/ink-marks.cjs');
+  // Drawn from every box, each line but the first and the last had two underlines a fifth of a point apart.
+  const lines = underlineBoxes(selected);
+  assert.equal(lines.length, 5, JSON.stringify(lines));
+  assert.deepEqual(lines.map(b => [b[0], b[2]]), [[71.99, 255.96], [71.99, 275.29], [71.99, 259.96], [71.99, 267.29], [71.99, 255.97]], 'each as wide as its line, from the top line down');
+  assert.deepEqual(lines.map(b => b[1]), [697.66, 684.63, 671.67, 658.63, 645.68], 'under the whole letters (the lower of a line\'s two boxes)');
+  assert.deepEqual(underlineBoxes([[10, 100, 60, 112], [70, 100, 120, 112]]), [[10, 100, 60, 112], [70, 100, 120, 112]], 'two columns on one row keep their own lines');
+  assert.deepEqual(underlineBoxes([null, [1, 2, NaN, 4]]), []);
+});
 test('a highlight of several lines is painted once everywhere: one box per line, filled as one shape', async () => {
   const { highlightBoxes } = require('../core/ink-marks.cjs');
   // The boxes that lie within another are left out; what is left is one box per line.

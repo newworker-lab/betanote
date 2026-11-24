@@ -617,7 +617,7 @@ try{const saved=JSON.parse(localStorage.getItem('app-ink-extra')||'null');if(ink
 function persistInkExtra(){try{localStorage.setItem('app-ink-extra',JSON.stringify({shape:inkState.shape,eraser:inkState.eraser}));}catch{}}
 const inkPaintBase=inkPaint;
 inkPaint=function(ctx,stroke,viewport,k){
-  if(stroke.tool==='mark'&&stroke.style==='underline'){ctx.save();ctx.fillStyle=stroke.color;for(const r of stroke.rects){const t=Math.max(.6,Math.min(2,(r[3]-r[1])*.07)),a=viewport.convertToViewportPoint(r[0],r[1]),b=viewport.convertToViewportPoint(r[2],r[1]+t);ctx.fillRect(Math.min(a[0],b[0])*k,Math.min(a[1],b[1])*k,Math.max(1,Math.abs(b[0]-a[0])*k),Math.max(1,Math.abs(b[1]-a[1])*k));}ctx.restore();return;}
+  if(stroke.tool==='mark'&&stroke.style==='underline'){ctx.save();ctx.fillStyle=stroke.color;for(const r of globalThis.appInkMarks.underlineBoxes(stroke.rects)){const t=Math.max(.6,Math.min(2,(r[3]-r[1])*.07)),a=viewport.convertToViewportPoint(r[0],r[1]),b=viewport.convertToViewportPoint(r[2],r[1]+t);ctx.fillRect(Math.min(a[0],b[0])*k,Math.min(a[1],b[1])*k,Math.max(1,Math.abs(b[0]-a[0])*k),Math.max(1,Math.abs(b[1]-a[1])*k));}ctx.restore();return;}
   // A highlight: one box per line, filled as one shape, so the colour is laid once where boxes meet (core/ink-marks.cjs).
   if(stroke.tool==='mark'){ctx.save();ctx.globalAlpha=.35;ctx.globalCompositeOperation='multiply';ctx.fillStyle=stroke.color;const shape=new Path2D();for(const r of globalThis.appInkMarks.highlightBoxes(stroke.rects)){const a=viewport.convertToViewportPoint(r[0],r[1]),b=viewport.convertToViewportPoint(r[2],r[3]);shape.rect(Math.min(a[0],b[0])*k,Math.min(a[1],b[1])*k,Math.abs(b[0]-a[0])*k,Math.abs(b[1]-a[1])*k);}ctx.fill(shape);ctx.restore();return;}
   if(stroke.tool==='text'){

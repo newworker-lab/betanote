@@ -47,6 +47,13 @@
     const within = (a, b) => a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
     return list.filter((a, i) => !list.some((b, j) => j !== i && within(a, b) && (!within(b, a) || j < i)));
   }
+  // The lines an underline of selected text runs under, in PDF space ([x0, y0, x1, y1], y growing up): one box per line,
+  // from the top line down. A selection gives a line wholly inside it two boxes (its element box and its text box);
+  // drawn from every box, each such line had two underlines a fraction of a point apart. The line runs under the whole
+  // letters, as joinLineBoxes finds it (which reads y growing down: the boxes are turned over for it and back).
+  function underlineBoxes(rects) {
+    return joinLineBoxes(highlightBoxes(rects).map(b => [b[0], -b[3], b[2], -b[1]])).map(b => [b[0], -b[3], b[2], -b[1]]);
+  }
   // A text box's look beyond its letters (optional, on PDF pages and in notebooks alike): a fill ('#rrggbb', opaque) and a
   // border { color: '#rrggbb', width: points, style: 'solid' | 'dashed' | 'dotted' }. Without either the box has none.
   const TEXT_BORDER_WIDTHS = [0.5, 1, 1.5, 2, 3, 4, 6], TEXT_BORDER_STYLES = ['solid', 'dashed', 'dotted'];
@@ -67,5 +74,5 @@
   const textBoxFrame = stroke => { const pad = stroke.width * 0.25, border = stroke.border ? stroke.border.width : 0; return { pad, border, out: pad + border }; };
   // The dashes of a border of width w (lines with round ends draw the dots): dashed 3w on, 2w off; dotted a dot every 2w.
   const textBorderDash = (style, w) => style === 'dashed' ? [3 * w, 2 * w] : style === 'dotted' ? [0, 2 * w] : [];
-  return { joinLineBoxes, highlightBoxes, TEXT_BORDER_WIDTHS, TEXT_BORDER_STYLES, validTextLook, cleanTextLook, hexColor, textLook, textBoxFrame, textBorderDash };
+  return { joinLineBoxes, highlightBoxes, underlineBoxes, TEXT_BORDER_WIDTHS, TEXT_BORDER_STYLES, validTextLook, cleanTextLook, hexColor, textLook, textBoxFrame, textBorderDash };
 });

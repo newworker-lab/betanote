@@ -41,6 +41,10 @@ const appName = require('../core/app-name.cjs');
   const body = runs => runs.filter(r => !r.startsWith('0,0,0,0') && !/ ×1$/.test(r));
   for (const [name, runs] of Object.entries({ five: report.five, two: report.two, pen: report.pen })) assert.equal(body(runs).length, 1, `${name}: ${JSON.stringify(runs)}`);
   assert.equal(body(report.five)[0].split(' ')[0], body(report.two)[0].split(' ')[0], 'five lines as light as two');
+  // The same five lines underlined: the selection gives the lines wholly inside it two boxes each, and one line is drawn under each line.
+  await select(0, 4); await p.evaluate(() => { const sel = getSelection(); inkMarkSelection({ range: sel.getRangeAt(0).cloneRange(), quote: String(sel).trim() }, 'underline'); }); await saved();
+  const underline = await p.evaluate(() => { const s = [...document.querySelector('.original-pages').inkDoc.strokes.values()].find(s => s.tool === 'mark' && s.style === 'underline'); return { boxes: s.rects.length, lines: globalThis.appInkMarks.underlineBoxes(s.rects).length }; });
+  assert.ok(underline.boxes > 5, `the selection gave more boxes than lines: ${JSON.stringify(underline)}`); assert.equal(underline.lines, 5, 'one underline a line on the screen');
   // Saved original PDF with ink.
   const file = path.join(out, 'saved.pdf'); await fs.rm(file, { force: true }); await app.evaluate((_, f) => globalThis.saveQueue.push(f), file);
   await p.locator('[data-action="ink-export-original"]').click(); await p.locator('#dialog #ink-export-include').waitFor(); if (!await p.locator('#dialog #ink-export-include').isChecked()) await p.locator('#dialog #ink-export-include').click();
@@ -49,6 +53,9 @@ const appName = require('../core/app-name.cjs');
   const saved5 = await PDFDocument.load(await fs.readFile(file)), annots = saved5.getPage(0).node.lookup(require('pdf-lib').PDFName.of('Annots')).asArray().map(ref => saved5.context.lookup(ref));
   const highlights = annots.filter(a => a.get(require('pdf-lib').PDFName.of('Subtype')).toString() === '/Highlight').map(a => a.lookup(require('pdf-lib').PDFName.of('QuadPoints')).size() / 8).sort();
   assert.deepEqual(highlights, [2, 5]);
+  // The underline too: one quad, and one bar in its appearance, per line.
+  const under = annots.filter(a => a.get(require('pdf-lib').PDFName.of('Subtype')).toString() === '/Underline');
+  assert.deepEqual(under.map(a => a.lookup(require('pdf-lib').PDFName.of('QuadPoints')).size() / 8), [5], 'one underline a line in the saved PDF');
   await app.close(); await fs.rm(temp, { recursive: true, force: true });
-  console.log('Highlight smoke passed: a text highlight over five lines is one colour on every line on the screen and in the saved PDF; a pen highlighter stroke going back over itself is laid once.');
+  console.log('Highlight smoke passed: a text highlight over five lines is one colour on every line on the screen and in the saved PDF; a pen highlighter stroke going back over itself is laid once; an underline over five lines is one line under each.');
 })().catch(e => { console.error(e); process.exit(1); });
