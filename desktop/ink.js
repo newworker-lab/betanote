@@ -727,11 +727,12 @@ function inkGesture(container,view,canvas,event,tool,mode){
 // the ink then lands there (inkTransfer, inkSendToNotebook). A pane whose source changed since its ink was made, or one
 // with no page drawn yet, takes nothing, and the ink stays in its own pane.
 const inkPanes=new Set();
+// Asked at every pointer move of a drag, so by the panes' own boxes (document.elementsFromPoint walks every text span
+// under the pointer and took most of a frame).
 function inkPaneAt(container,cx,cy){
-  for(const el of document.elementsFromPoint(cx,cy)){
-    let pane=null;for(const c of inkPanes){if(!c.isConnected)inkPanes.delete(c);else if(c.contains(el)){pane=c;break;}}
-    if(pane)return pane===container||pane.inkDoc&&!pane.inkDoc.stale&&inkPageViews(pane).length?pane:container;
-  }
+  const over=c=>{const r=c.getBoundingClientRect();return r.width>0&&cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom;};
+  if(over(container))return container;
+  for(const c of inkPanes){if(!c.isConnected){inkPanes.delete(c);continue;}if(c!==container&&c.inkDoc&&!c.inkDoc.stale&&over(c)&&inkPageViews(c).length)return c;}
   return container;
 }
 function inkDrop(container,view,box,[dx,dy],[cx,cy]){

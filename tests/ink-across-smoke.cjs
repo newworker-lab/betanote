@@ -54,8 +54,11 @@ const root = path.resolve(__dirname, '..');
     assert.equal((await ink('T')).length, 0, 'none on the translation');
     await tool('read');
 
-    // The rectangle, pressed on its edge and let go over the translation.
+    // The rectangle, pressed on its edge and let go over the translation. Finding the pane under the pointer at every
+    // move must stay cheap: it does not walk the elements under the pointer (that took most of a frame per move).
+    await p.evaluate(() => { window.hitTests = 0; const e = document.elementsFromPoint.bind(document); document.elementsFromPoint = (...a) => { window.hitTests++; return e(...a); }; });
     await dragTo(at(o, .2, .36), at(t, .5, .4)); await drop();
+    assert.equal(await p.evaluate(() => window.hitTests), 0, 'a drag asks for no element hit test');
     assert.deepEqual((await ink('O')).map(s => s.tool), ['text'], 'the rectangle left the original');
     let moved = await ink('T'); assert.deepEqual(moved.map(s => s.tool + (s.shape || '') + s.page), ['penrect0'], 'and is the translation’s, on the page it was dropped on');
     assert.ok(!before.some(s => s.id === moved[0].id), 'as a new stroke');
@@ -108,6 +111,7 @@ const root = path.resolve(__dirname, '..');
     assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.id).sort()], [0, before.map(s => s.id).sort()], 'another: the rectangle too');
     await p.keyboard.press('Control+y'); await p.waitForTimeout(400);
     assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.tool)], [1, ['text']], 'Ctrl+Y moves it onto the notebook again');
+    assert.equal(await p.evaluate(() => window.hitTests), 0, 'nor does a drag onto the notebook');
     assert.deepEqual(errors, [], 'nothing thrown');
     console.log('Ink across smoke passed: a shape and a text box of the original go to the translation and to a notebook page where they are let go, one undo each.');
   } finally { await app.close(); await fs.rm(temp, { recursive: true, force: true }); }

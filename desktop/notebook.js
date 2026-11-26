@@ -212,7 +212,10 @@ let nbGhost=null;
 globalThis.appInk.nb={
   at(cx,cy){
     if(state.screen!=='reader'||state.mode!=='notebook'||!nb.doc)return null;
-    const el=document.elementsFromPoint(cx,cy).map(n=>n.closest?.('.nb-page')).find(Boolean),page=el&&nbPage(el.dataset.pageId);
+    // By the pages' boxes, inside the list that scrolls them (asked at every pointer move of a drag).
+    const list=document.querySelector('.nb-pages'),inside=(r)=>r.width>0&&cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom;
+    if(!list||!inside(list.getBoundingClientRect()))return null;
+    const el=[...list.querySelectorAll('.nb-page')].find(n=>inside(n.getBoundingClientRect())),page=el&&nbPage(el.dataset.pageId);
     return page?{el,pageId:page.id,width:page.width,height:page.height,rect:el.getBoundingClientRect()}:null;
   },
   preview(t,made){
