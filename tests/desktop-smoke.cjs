@@ -121,18 +121,18 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
   await p.keyboard.press('Enter');await p.keyboard.press('Enter');await p.keyboard.type('두 번째 문단');await p.locator('#dialog .md-live .cm-math .katex').waitFor();assert.equal(await p.locator('.math-peek').count(),0);
   assert.equal(await p.locator('#note-editor').inputValue(),'질량 $E=mc^2$\n\n두 번째 문단');
   await p.keyboard.type(' $a^2+b^2$');await p.locator('#dialog .md-live .cm-math-source').waitFor();await p.keyboard.type(' 끝');await p.waitForFunction(()=>document.querySelectorAll('#dialog .md-live .cm-math .katex').length===2);
-  await p.keyboard.press('Control+z');await p.keyboard.press('Control+z');await p.keyboard.press('Control+z');
+  await p.keyboard.press('ControlOrMeta+z');await p.keyboard.press('ControlOrMeta+z');await p.keyboard.press('ControlOrMeta+z');
   await p.locator('#note-editor').evaluate(a=>{a.value='질량 $E=mc^2$\n\n두 번째 문단';a.dispatchEvent(new Event('input',{bubbles:true}));});
   await p.locator('[data-md-view="split"]').click();await p.locator('.note-editor-preview .katex').waitFor();assert.equal(await p.locator('#note-editor').inputValue(),'질량 $E=mc^2$\n\n두 번째 문단');
   await p.locator('#note-editor').evaluate(a=>a.setSelectionRange(0,0));await p.locator('[data-md="bullet"]').click();
-  await p.locator('#note-editor').evaluate(a=>a.setSelectionRange(a.value.length,a.value.length));await p.keyboard.type(' ');await p.keyboard.press('Control+b');
+  await p.locator('#note-editor').evaluate(a=>a.setSelectionRange(a.value.length,a.value.length));await p.keyboard.type(' ');await p.keyboard.press('ControlOrMeta+b');
   assert.equal(await p.locator('#note-editor').inputValue(),'- 질량 $E=mc^2$\n\n두 번째 문단 **굵게**');await p.locator('.note-editor-preview strong').waitFor();
   await p.locator('[data-md-view="live"]').click();await p.locator('#dialog [data-action="close"]').last().click();
   await p.waitForFunction(()=>document.querySelector('#note')?.value==='- 질량 $E=mc^2$\n\n두 번째 문단 **굵게**');assert.equal(await p.locator('.memo-card.open .memo-title').inputValue(),'실험 메모');
   await p.locator('.memo-card.open [data-memo-delete]').click();assert.equal(await p.locator('.memo-card').count(),1);
   await p.locator('.undo-toast button').click();await p.locator('.memo-card.open .memo-title').waitFor();assert.equal(await p.locator('.memo-card.open .memo-title').inputValue(),'실험 메모');
   // A picture pasted into a memo is saved in the vault and shown in place.
-  await p.locator('.memo-card.open .field-live .cm-content').click();await p.keyboard.press('Control+End');
+  await p.locator('.memo-card.open .field-live .cm-content').click();await p.keyboard.press((process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End'));
   await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=30;c.height=20;c.getContext('2d').fillRect(0,0,30,20);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'x.png',{type:'image/png'}));document.querySelector('.memo-card.open .field-live .cm-content').dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));});
   await p.locator('#toast').filter({hasText:'그림을 메모에 넣었습니다'}).waitFor();const pasted=(await (await openNote(p)).inputValue()).match(/!\[붙여넣은 그림\]\(note-image:([0-9a-f]{32}\.png)\)/)?.[1];assert.ok(pasted,'the picture line is in the memo');
   await fs.access(path.join(vault,appName.vaultDir,'note-images',pasted));await p.locator('.memo-card.open .field-live .cm-image img').first().evaluate(img=>img.decode());
@@ -249,7 +249,7 @@ if(process.env.APP_EXPORT_TEST_PATH)await fs.copyFile(path.join(temp,'export.pdf
   assert.equal(await p.locator('.topbar [data-sidebar-toggle]').count(),0);
   await p.evaluate(()=>{window.resizeNote=document.querySelector('#note');window.resizePdf=document.querySelector('.original-pages')});
   const resize=p.locator('.navigation-resize'),beforeWidth=(await p.locator('#navigation-panel').boundingBox()).width,grip=await resize.boundingBox();await p.mouse.move(grip.x+grip.width/2,grip.y+100);await p.mouse.down();await p.mouse.move(grip.x+grip.width/2+64,grip.y+100,{steps:8});await p.mouse.up();assert.ok(Math.abs((await p.locator('#navigation-panel').boundingBox()).width-beforeWidth-64)<2);assert.equal(await p.evaluate(()=>window.resizeNote===document.querySelector('#note')&&window.resizePdf===document.querySelector('.original-pages')),true);await p.waitForFunction(()=>{const pages=document.querySelector('.translated-pages'),style=getComputedStyle(pages);return pages.querySelector('.translated-sheet,.pdf-source-sheet').getBoundingClientRect().width<=pages.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)+1;});
-  await resize.focus();await resize.press('Home');assert.equal(await resize.getAttribute('aria-valuenow'),'180');await resize.press('End');assert.equal(await resize.getAttribute('aria-valuenow'),'360');await resize.dblclick();assert.equal(await resize.getAttribute('aria-valuenow'),'220');await resize.press('ArrowRight');assert.equal(await resize.getAttribute('aria-valuenow'),'230');assert.equal(await p.evaluate(()=>localStorage.getItem('app-navigation-width')),'230');
+  await resize.focus();await resize.press('Home');assert.equal(await resize.getAttribute('aria-valuenow'),'180');await resize.press('End');assert.equal(await resize.getAttribute('aria-valuenow'),String(await p.evaluate(()=>Math.max(180,Math.min(480,Math.floor(innerWidth*.45))))),'the widest the window allows');await resize.dblclick();assert.equal(await resize.getAttribute('aria-valuenow'),'220');await resize.press('ArrowRight');assert.equal(await resize.getAttribute('aria-valuenow'),'230');assert.equal(await p.evaluate(()=>localStorage.getItem('app-navigation-width')),'230');
   // The right panel resizes like the navigation (a wide window shows it as a side column).
   await p.setViewportSize({width:1400,height:900});
   const panelResize=p.locator('.panel-resize').first(),panelBefore=(await p.locator('#notes-panel').boundingBox()).width,panelGrip=await panelResize.boundingBox();

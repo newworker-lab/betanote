@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.6" src="https://img.shields.io/badge/version-1.1.6-1b64da">
-  <img alt="Windows · Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4e5968">
+  <img alt="버전 1.1.7" src="https://img.shields.io/badge/version-1.1.7-1b64da">
+  <img alt="Windows · Linux · macOS(베타)" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20(beta)-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">
   <img alt="AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-663399">
@@ -109,8 +109,12 @@
 | Windows 10 · 11 (x64) | `betanote-<버전>-windows-x64.zip` | 압축을 모두 푼 뒤 폴더 안의 `betanote.exe` |
 | Ubuntu 22.04 이상 (x64), 설치형 | `betanote_<버전>_amd64.deb` | `sudo apt install ./betanote_<버전>_amd64.deb` 뒤 앱 목록에서 실행 |
 | Linux (x64), 압축을 풀어 쓰는 방식 | `betanote-<버전>-linux-x64.tar.gz` | 압축을 푼 뒤 폴더 안의 `betanote` |
+| macOS, Apple 실리콘 (**베타**) | `betanote-<버전>-macos-arm64.zip` | 압축을 푼 뒤 `betanote.app`을 우클릭 → `열기` |
+| macOS, 인텔 (**베타**) | `betanote-<버전>-macos-x64.zip` | 압축을 푼 뒤 `betanote.app`을 우클릭 → `열기` |
 
-> 코드 서명이 없어 Windows가 처음 실행할 때 경고를 보일 수 있습니다. macOS용은 준비 중입니다.
+> 코드 서명이 없어 Windows가 처음 실행할 때 경고를 보일 수 있습니다.
+>
+> **macOS용은 베타입니다.** 자동 시험은 통과했지만 실제 맥에서 충분히 써 보지 못했습니다. Apple 서명·공증이 없어 처음 열 때 경고가 뜨며, "손상되어 열 수 없습니다"라고 나오면 터미널에서 `xattr -cr ~/Downloads/betanote.app`(앱을 둔 경로)을 한 번 실행하면 열립니다. 단축키는 `Ctrl` 대신 `⌘`를 씁니다. 겪은 문제는 [이슈](../../issues)로 알려 주세요.
 
 ### 2. 저장소 연결
 
@@ -192,7 +196,8 @@
 - 올가미로 필기를 둘러 고르면 옮기기 · 크기 조절 · 색 바꾸기 · 복제가 됩니다.
 - 선택 도구로 펜 선 · 도형 · 텍스트 상자를 바로 끌어 옮깁니다. 형광펜은 올가미로 고른 뒤 옮깁니다.
 - 끌어서 다른 쪽 위에 놓으면 그 쪽으로 옮겨집니다(쪽 밖으로 나가지 않습니다).
-- 동시보기에서는 원문의 필기를 끌어 번역 쪽에(반대로도), 노트북 화면에서는 왼쪽 PDF의 펜 선 · 도형 · 텍스트 상자를 끌어 노트북 종이에 놓을 수 있습니다.
+- 고른 펜 선 · 도형 · 텍스트 상자는 `Ctrl+C`로 복사해 `Ctrl+V`로 포인터가 있는 쪽에 붙입니다(PDF와 노트북 사이에서도 됩니다).
+- 동시보기에서는 원문의 필기를 끌어 번역 쪽에(반대로도), 노트북 화면에서는 왼쪽 PDF의 펜 선 · 도형 · 텍스트 상자를 끌어 노트북 종이에(반대로 노트북의 것을 PDF에) 놓을 수 있습니다.
 - 문장을 끌어 고르면 형광펜 · 밑줄 · 주석을 바로 붙일 수 있습니다.
 - 필기는 원문과 번역에 각각 따로 저장됩니다.
 - PDF로 저장하면 필기가 다른 PDF 프로그램에서도 보이는 표준 주석으로 들어갑니다.
@@ -276,7 +281,7 @@
 | 번역할 수 있는 쪽수 | PDF 한 개에 500쪽까지 |
 | 글자 인식(OCR) | 영어만 |
 | 번역 결과 언어 | 한국어만 |
-| 운영체제 | Windows 10 · 11, Ubuntu 22.04 이상 (x64). macOS는 준비 중 |
+| 운영체제 | Windows 10 · 11, Ubuntu 22.04 이상 (x64). macOS는 베타(Apple 실리콘 · 인텔) |
 
 </details>
 
@@ -302,6 +307,7 @@
 | 필기 | `Ctrl+1` ~ `9` | 도구 고르기 |
 | | `Shift+1` ~ `9` | 색 고르기 |
 | | `Ctrl+Z` · `Ctrl+Y` | 실행 취소 · 다시 실행 |
+| | `Ctrl+C` · `Ctrl+V` | 고른 펜 선 · 도형 · 텍스트 상자 복사 · 붙여넣기 |
 | 문장을 고른 뒤 | `H` · `U` · `N` | 형광펜 · 밑줄 · 주석 |
 
 ---
@@ -380,7 +386,7 @@ Zotero에서 "파일 내보내기"를 켜고 BibTeX이나 RIS로 내보낸 뒤, 
 ## 앞으로
 
 - 번역 결과 언어 추가 (중국어 · 일본어 · 프랑스어 · 독일어 · 스페인어 · 이탈리아어)
-- macOS
+- macOS 정식 지원 (Apple 서명 · 공증, 실제 맥에서의 검증)
 - Windows 설치 프로그램과 자동 업데이트
 
 원하는 기능이 있으면 [이슈](../../issues)로 알려 주세요.

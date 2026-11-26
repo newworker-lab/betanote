@@ -79,7 +79,7 @@ const root = path.resolve(__dirname, '..');
     assert.ok(moved.y < pen.y - 200, `down the page (PDF y grows upward): ${pen.y} → ${moved.y}`);
     assert.equal(await picked(), '', 'no text picked while moving the stroke');
     assert.ok(now.some(s => s.id === rect.id) && now.some(s => s.id === marker.id), 'the others stay');
-    await p.keyboard.press('Escape'); await p.keyboard.press('Control+z');
+    await p.keyboard.press('Escape'); await p.keyboard.press('ControlOrMeta+z');
     await p.waitForFunction(id => [...document.querySelector('.original-pages').inkDoc.strokes.values()].some(s => s.id === id), pen.id);
     assert.ok(!(await strokes()).some(s => s.from === pen.id), 'one Ctrl+Z brings it back');
 
@@ -113,7 +113,7 @@ const root = path.resolve(__dirname, '..');
     // An undone move leaves no selection box behind.
     let pen1 = await plainPen(), pt = await onStroke('.original-pages', pen1.id);
     await p.mouse.move(...pt); await p.mouse.down(); await p.mouse.move(pt[0] + 30, pt[1] + 20, { steps: 5 }); await p.mouse.up(); await p.waitForTimeout(200);
-    await p.keyboard.press('Control+z'); await p.waitForFunction(id => [...document.querySelector('.original-pages').inkDoc.strokes.values()].some(s => s.id === id), pen1.id);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(id => [...document.querySelector('.original-pages').inkDoc.strokes.values()].some(s => s.id === id), pen1.id);
     assert.equal(await p.locator('.ink-selection').count(), 0, 'an undone move leaves no selection box');
     // A colour pressed with a stroke selected by the select tool recolours it; the tool stays.
     pt = await onStroke('.original-pages', pen1.id); await p.mouse.click(...pt); await p.locator('.original-pages .ink-selection').waitFor();
@@ -177,7 +177,7 @@ const root = path.resolve(__dirname, '..');
     let nbNow = await nbStrokes(); const nbMovedPen = nbNow.find(s => s.id === nbPen.id);
     assert.ok(nbMovedPen.x > nbPen.x + 20 && nbMovedPen.y > nbPen.y + 40, `the notebook stroke moved: ${JSON.stringify([nbPen, nbMovedPen])}`);
     assert.equal(nbNow.find(s => s.tool === 'highlighter').y, nbBefore.find(s => s.tool === 'highlighter').y, 'the highlighter stays');
-    await p.keyboard.press('Escape'); await p.keyboard.press('Control+z'); await p.waitForFunction(([id, y]) => nb.doc.pages[0].strokes.find(s => s.id === id)?.points[1] === y, [nbPen.id, nbPen.y]);
+    await p.keyboard.press('Escape'); await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(([id, y]) => nb.doc.pages[0].strokes.find(s => s.id === id)?.points[1] === y, [nbPen.id, nbPen.y]);
     await nbDrag([[.35, .21]]); await p.locator('.nb-selection').waitFor();
     assert.equal((await nbStrokes()).find(s => s.id === nbPen.id).y, nbPen.y, 'pressed, it stays where it is');
     await p.keyboard.press('Escape'); await p.locator('.nb-selection').waitFor({ state: 'detached' });

@@ -62,7 +62,7 @@ const root = path.resolve(__dirname, '..');
     // The cursor taken onto the picture's line (arrow up): its source shows, to edit.
     await p.keyboard.press('ArrowUp'); await p.waitForTimeout(100);
     assert.equal((await look(p, tab)).source, true, 'the cursor on the picture line shows its source');
-    await p.keyboard.press('Control+End'); await shows(p, tab, 'the cursor back under it');
+    await p.keyboard.press((process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')); await shows(p, tab, 'the cursor back under it');
 
     // 3. The wide editor and the memo's own window, opened on a memo starting with a picture.
     await p.evaluate(([k, t]) => { notes[k] = t; fieldEditorOf(document.querySelector('.memo-card.open .note-box textarea')).setDoc(t); }, [key, WITH_TEXT]);

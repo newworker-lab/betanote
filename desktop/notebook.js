@@ -58,7 +58,7 @@ async function nbMount(){
 function nbRender(){
   const pane=document.querySelector('.notebook-pane');if(!pane)return;
   const own=nb.list.filter(n=>n.paperId===state.selected),other=nb.list.filter(n=>n.paperId!==state.selected);
-  pane.querySelector('header').innerHTML=`<strong>${tr('노트북')}</strong><select class="nb-select" aria-label="${tr('노트북 선택')}"><option value="">${tr('노트북 선택…')}</option>${own.length?`<optgroup label="${tr('이 자료',null,'notebook group')}">${own.map(n=>`<option value="${esc(n.id)}" ${n.id===nb.id?'selected':''}>${esc(n.title)}</option>`).join('')}</optgroup>`:''}${other.length?`<optgroup label="${tr('다른 자료·프로젝트')}">${other.map(n=>`<option value="${esc(n.id)}" ${n.id===nb.id?'selected':''}>${n.paperId===null?tr('{title} (프로젝트)',{title:esc(n.title)}):esc(n.title)}</option>`).join('')}</optgroup>`:''}</select><span class="nb-status" role="status" aria-live="polite">${esc(nb.status)}</span><button type="button" class="pdf-tool nb-icon" data-action="nb-new" title="${tr('새 노트북')}" aria-label="${tr('새 노트북')}">${icon('noteAdd')}</button>${nb.doc||!nbWindow?`<button type="button" class="pdf-tool nb-icon nb-save-menu" data-nb-save-menu aria-haspopup="menu" aria-expanded="false" title="${tr('저장 (PDF · Markdown)')}" aria-label="${tr('저장')}">${icon('download')}<span class="nb-caret" aria-hidden="true">${icon('chipDown')}</span></button>`:''}${!nbWindow&&nb.doc?`<button type="button" class="pdf-tool nb-icon nb-more" data-nb-menu aria-haspopup="menu" aria-expanded="false" title="${tr('이 노트북: 이름 바꾸기 · 삭제')}" aria-label="${tr('노트북 메뉴')}">${icon('nbMenu')}</button>`+paneWindowButton('notebook',tr('노트북'),'data-action="nb-window"'):''}`;
+  pane.querySelector('header').innerHTML=`<strong>${tr('노트북')}</strong><select class="nb-select" aria-label="${tr('노트북 선택')}"><option value="">${tr('노트북 선택…')}</option>${own.length?`<optgroup label="${tr('이 자료',null,'notebook group')}">${own.map(n=>`<option value="${esc(n.id)}" ${n.id===nb.id?'selected':''}>${esc(n.title)}</option>`).join('')}</optgroup>`:''}${other.length?`<optgroup label="${tr('다른 자료·프로젝트')}">${other.map(n=>`<option value="${esc(n.id)}" ${n.id===nb.id?'selected':''}>${n.paperId===null?tr('{title} (프로젝트)',{title:esc(n.title)}):esc(n.title)}</option>`).join('')}</optgroup>`:''}</select><span class="nb-status" role="status" aria-live="polite" data-state="${nb.saved?'saved':''}">${esc(nb.status)}</span><button type="button" class="pdf-tool nb-icon" data-action="nb-new" title="${tr('새 노트북')}" aria-label="${tr('새 노트북')}">${icon('noteAdd')}</button>${nb.doc||!nbWindow?`<button type="button" class="pdf-tool nb-icon nb-save-menu" data-nb-save-menu aria-haspopup="menu" aria-expanded="false" title="${tr('저장 (PDF · Markdown)')}" aria-label="${tr('저장')}">${icon('download')}<span class="nb-caret" aria-hidden="true">${icon('chipDown')}</span></button>`:''}${!nbWindow&&nb.doc?`<button type="button" class="pdf-tool nb-icon nb-more" data-nb-menu aria-haspopup="menu" aria-expanded="false" title="${tr('이 노트북: 이름 바꾸기 · 삭제')}" aria-label="${tr('노트북 메뉴')}">${icon('nbMenu')}</button>`+paneWindowButton('notebook',tr('노트북'),'data-action="nb-window"'):''}`;
   const body=pane.querySelector('.nb-body');
   if(!nb.doc){nb.sel=null;body.innerHTML=`<div class="pdf-empty"><h3>${tr('자료를 보면서 쓸 노트북을 만드세요')}</h3><button class="primary" data-action="nb-new">${tr('새 노트북')}</button></div>`;return;}
   const pins=nbPinIndex(),keptScroll=body.querySelector('.nb-pages')?.scrollTop||0,keptLeft=body.querySelector('.nb-pages')?.scrollLeft||0;
@@ -126,15 +126,16 @@ function nbGrow(page){
 }
 // 빈 아래쪽 잘라내기: the board ends NB_BOARD_ROOM under what is on it, a sheet at least.
 function nbTrimBoard(page){const height=Math.max(nbSheet(page.width),Math.ceil(nbContentBottom(page)+NB_BOARD_ROOM));if(height>=page.height)return false;page.height=height;nb.full?.delete(page.id);return true;}
-function nbSave(now=false){nb.dirty=true;nb.status=tr('저장 중…');nbStatus();clearTimeout(nb.timer);nb.timer=setTimeout(()=>nbFlush().catch(()=>{}),now?0:400);}
+function nbSave(now=false){nb.dirty=true;nb.saved=false;nb.status=tr('저장 중…');nbStatus();clearTimeout(nb.timer);nb.timer=setTimeout(()=>nbFlush().catch(()=>{}),now?0:400);}
 async function nbFlush(){
   clearTimeout(nb.timer);if(nb.saving)await nb.saving.catch(()=>{});if(!nb.dirty||!nb.doc)return;
   // Saved to the vault the notebook was opened from, even after another vault opened.
   nbSyncMemos();nb.dirty=false;const id=nb.vault||state.storageKey,doc=JSON.parse(JSON.stringify(nb.doc));
-  nb.saving=window.appApi.notebookSave(id,doc).then(()=>{nb.status=nb.dirty?tr('저장 중…'):tr('✓ 노트북 저장됨');nbStatus();},error=>{if(id!==state.storageKey){nb.status=tr('이전 저장소가 닫혀 노트북 변경을 저장하지 못했습니다.');nbStatus();throw error;}nb.dirty=true;nb.status=tr('저장 실패: {error}',{error:shownError(error)});nbStatus();setTimeout(()=>nbFlush().catch(()=>{}),3000);throw error;}).finally(()=>{nb.saving=null;});
+  nb.saving=window.appApi.notebookSave(id,doc).then(()=>{nb.status=nb.dirty?tr('저장 중…'):'';nb.saved=!nb.dirty;nbStatus();},error=>{if(id!==state.storageKey){nb.status=tr('이전 저장소가 닫혀 노트북 변경을 저장하지 못했습니다.');nbStatus();throw error;}nb.dirty=true;nb.status=tr('저장 실패: {error}',{error:shownError(error)});nbStatus();setTimeout(()=>nbFlush().catch(()=>{}),3000);throw error;}).finally(()=>{nb.saving=null;});
   return nb.saving;
 }
-function nbStatus(){const node=document.querySelector('.nb-status');if(node)node.textContent=nb.status;}
+// A notebook that is saved says nothing: only saving and a failure are said. The state is kept on the node (data-state).
+function nbStatus(){const node=document.querySelector('.nb-status');if(node){node.textContent=nb.status;node.dataset.state=nb.saved?'saved':'';}}
 // A page's size in points (A4 unless it was added at another size or from a PDF).
 const nbSize=el=>({w:Number(el?.dataset.w)||NB_W,h:Number(el?.dataset.h)||NB_H});
 // The page's exact width (clientWidth is rounded: on a long whiteboard the rounding grows down the page).
@@ -224,6 +225,18 @@ globalThis.appInk.nb={
     nbGhost=t.el;nbPaint(t.el,[...page.strokes,...made.strokes]);t.el.querySelectorAll(':scope>.nb-ghost').forEach(n=>n.remove());
     t.el.insertAdjacentHTML('beforeend',made.items.map(item=>`<div class="nb-ghost" style="left:${pct(item.x,page.width)};top:${pct(item.y,page.height)};width:${pct(item.w,page.width)};height:${pct(item.h,page.height)}"></div>`).join(''));
   },
+  // Pasted ink (desktop/ink.js): on the page under the pointer, its middle there; with no page under it, on the page in
+  // view. Kept inside the page, chosen, one step to undo.
+  paste(t,clip,at){
+    if(!nb.doc)return false;const pageId=t?.pageId||nbTargetPage(),page=pageId&&nbPage(pageId),el=page&&(t?.el||nbPageEl(pageId));if(!page||!el)return false;
+    const r=el.getBoundingClientRect(),k=nbScale(el),visible=document.querySelector('.nb-pages')?.getBoundingClientRect();
+    const mid=t&&at?[(at[0]-r.left)/k,(at[1]-r.top)/k]:[page.width/2,visible?nbClamp(((visible.top+visible.bottom)/2-r.top)/k,0,page.height):page.height/2];
+    const x0=nbClamp(mid[0]-clip.w/2,0,Math.max(0,page.width-clip.w)),y0=nbClamp(mid[1]-clip.h/2,0,Math.max(0,page.height-clip.h));
+    const strokes=clip.strokes.map(st=>{const points=[...st.points];for(let i=0;i<points.length;i+=4){points[i]=nbRound(points[i]+x0);points[i+1]=nbRound(points[i+1]+y0);}return {id:nbId(),tool:st.tool,color:st.color,width:st.width,points,...(st.shape?{shape:st.shape}:{})};});
+    const items=clip.items.filter(i=>i.type==='text').map(i=>({...i,id:nbId(),x:Math.round(i.x+x0),y:Math.round(i.y+y0)}));
+    if(nbChange('붙여넣기',()=>{page.strokes.push(...strokes);page.items.push(...items);})!==true)return false; // i18n:keep — the undo label (not shown)
+    nbRefreshPage(el);nbSelect({pageId,strokes:strokes.map(st=>st.id),items:items.map(i=>i.id)});return true;
+  },
   take(t,strokes,items,extra){
     const page=nb.doc&&nbPage(t.pageId);if(!page||!strokes.length&&!items.length)return false;
     const kept=nbChange('옮기기',()=>{page.strokes.push(...strokes);page.items.push(...items);},extra)===true; // i18n:keep
@@ -244,7 +257,7 @@ function nbBindPage(el){
     // A lasso selection: its corner scales it, the hand moves it from
     // anywhere on its page and the lasso from inside it.
     const grip=sel&&event.button===0&&(event.target.closest('.ink-handle')?'scale':!touchPans&&(tool==='hand'||tool==='lasso'&&nbInBox(sel.box,at))?'shift':null);
-    if(grip){event.preventDefault();el.setPointerCapture(event.pointerId);document.body.classList.add('ink-grabbing');nbPointer={kind:grip,el,start:at,last:at,client:[event.clientX,event.clientY],pointerId:event.pointerId};return;}
+    if(grip){event.preventDefault();el.setPointerCapture(event.pointerId);globalThis.appInk.grabbing(true,el);nbPointer={kind:grip,el,start:at,last:at,client:[event.clientX,event.clientY],pointerId:event.pointerId};return;}
     // Select tool: a press on a pen stroke or shape (boxes come first) selects it, or keeps the selection it is in, and
     // the same press drags it, as on PDF pages; a press on nothing lets go of the selection.
     if(tool==='read'&&!event.target.closest('.nb-item')){
@@ -252,7 +265,7 @@ function nbBindPage(el){
       if(!stroke){if(nb.sel)nbSelect(null);return;}
       event.preventDefault();if(!sel?.strokes.includes(stroke.id))nbSelect({pageId:el.dataset.pageId,strokes:[stroke.id],items:[]});
       // A tap selects: nothing moves until the pointer has gone a few pixels.
-      el.setPointerCapture(event.pointerId);document.body.classList.add('ink-grabbing');nbPointer={kind:'shift',el,start:at,last:at,client:[event.clientX,event.clientY],slop:4/nbScale(el),pointerId:event.pointerId};return;
+      el.setPointerCapture(event.pointerId);globalThis.appInk.grabbing(true,el);nbPointer={kind:'shift',el,start:at,last:at,client:[event.clientX,event.clientY],slop:4/nbScale(el),pointerId:event.pointerId};return;
     }
     // Select tool: drag a box (or its corner) to move or resize it.
     if(tool==='read'){const item=event.target.closest('.nb-item');if(!item||event.button!==0)return;nbFocusBox(item.dataset.itemId);
@@ -281,6 +294,9 @@ function nbBindPage(el){
 function nbMove(event){
   const p=nbPointer;if(!p)return;const page=nbPage(p.el.dataset.pageId);if(!page)return;
   if(p.kind==='move'){const [x,y]=nbPoint(p.el,event),item=page.items.find(i=>i.id===p.id);if(!item)return;p.dx=x-p.start[0];p.dy=y-p.start[1];p.client=[event.clientX,event.clientY];
+    p.pdf=item.type==='text'?globalThis.appInk.pdf.at(...p.client):null;
+    if(p.pdf){if(p.node)p.node.style.visibility='hidden';globalThis.appInk.pdf.preview(p.pdf,nbForPdf(p.el,p.pdf,nbItemBox(item),[p.dx,p.dy],[],[item]));return;}
+    globalThis.appInk.pdf.preview(null);if(p.node)p.node.style.visibility='';
     p.plan=nbDrop(p.el,nbItemBox(item),[p.dx,p.dy],p.client);nbPlaceNode(p.node,item,p.plan);return;}
   if(p.kind==='resize'){const [x,y]=nbPoint(p.el,event),item=page.items.find(i=>i.id===p.id);if(!item)return;p.dx=x-p.start[0];p.dy=y-p.start[1];
     const nx=item.x,ny=item.y,nw=Math.max(20,item.w+p.dx),nh=Math.max(16,item.h+p.dy);
@@ -318,8 +334,10 @@ function nbDrawPreview(p,page){
 function nbEnd(){
   const p=nbPointer;nbPointer=null;if(!p)return;const pageId=p.el.dataset.pageId;
   // Whatever the gesture, its preview ends with it.
-  p.live?.end();if(p.frame)cancelAnimationFrame(p.frame);
+  p.live?.end();if(p.frame)cancelAnimationFrame(p.frame);globalThis.appInk.pdf.preview(null);
   if(p.kind==='move'||p.kind==='resize'){if(!p.dx&&!p.dy){if(p.kind==='move'&&p.node?.matches('.nb-memo-card:not(.open)'))nbMemoOpen(p.id);return;}
+    // A text box let go over a PDF page beside the notebook becomes that page's.
+    if(p.kind==='move'&&p.pdf){const item=nbPage(pageId)?.items.find(i=>i.id===p.id);if(item)nbSendToPdf(p.el,p.pdf,nbItemBox(item),[p.dx,p.dy],[],[item.id]);if(nbFocus===p.id)nbFocus=null;nbRefreshPage(p.el);nbMarkFocus();return;}
     // A box moved onto another page becomes that page's (one undo step for both pages).
     const plan=p.kind==='move'?p.plan:null,onto=plan&&plan.el!==p.el;
     nbChange(p.kind==='move'?'이동':'크기',()=>{const from=nbPage(pageId),item=from.items.find(i=>i.id===p.id);if(!item)return;if(plan){const to=plan.page,[x,y]=plan.map([item.x,item.y]);item.x=nbClamp(Math.round(x),0,Math.max(0,Math.floor(to.width-item.w)));item.y=nbClamp(Math.round(y),0,Math.max(0,Math.floor(to.height-item.h)));if(onto){from.items=from.items.filter(i=>i!==item);to.items.push(item);}}else{item.w=Math.round(Math.max(20,item.w+p.dx));item.h=Math.round(Math.max(16,item.h+p.dy));}}); // i18n:keep — the undo label (not shown)
@@ -332,9 +350,11 @@ function nbEnd(){
     nbSelect({pageId,strokes,items});toast(tr('{n}개를 선택했습니다. 끌어서 옮기고, 모서리로 크기를 바꾸고, 위의 막대로 복제·삭제합니다(Ctrl+D·Delete).',{n:strokes.length+items.length}));return;
   }
   if(p.kind==='shift'||p.kind==='scale'){
-    document.body.classList.remove('ink-grabbing');const sel=nb.sel;
+    globalThis.appInk.grabbing(false);const sel=nb.sel;
     if(!sel){for(const el of new Set([p.el,p.shown].filter(Boolean)))if(el.isConnected)nbRefreshPage(el);return;}
     if(p.slop&&!p.moved){nbRefreshPage(p.el);return;}
+    const pdf=p.kind==='shift'?globalThis.appInk.pdf.at(...p.client):null;
+    if(pdf){const sent=nbSendToPdf(p.el,pdf,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],sel.strokes,sel.items);if(sent)nb.sel=null;for(const el of new Set([p.el,p.shown].filter(Boolean)))if(el.isConnected)nbRefreshPage(el);return;}
     const plan=p.kind==='shift'?nbDrop(p.el,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],p.client):null,{map,k}=plan?{map:plan.map,k:1}:nbSelMap(p);
     // Every page the drag drew on is drawn again from what it holds.
     const refresh=()=>{for(const el of new Set([p.el,p.shown,plan?.el].filter(Boolean)))nbRefreshPage(el);};
@@ -404,6 +424,17 @@ function nbPlaceNode(node,item,plan){
   if(!node)return;const m=nbMovedItem(item,plan.map,1,plan.page),page=plan.page;if(node.parentElement!==plan.el)plan.el.querySelector(':scope>.nb-ink').before(node);
   Object.assign(node.style,{left:pct(m.x,page.width),top:pct(m.y,page.height),width:pct(m.w,page.width)},node.matches('.nb-memo-card:not(.open)')?{}:{height:pct(m.h,page.height)});
 }
+// What of a notebook page can go onto a PDF page (desktop/ink.js appInk.pdf): its strokes and its text boxes. Memo
+// cards, pictures and source cards are the notebook's own and stay.
+function nbForPdf(el,pdf,box,d,strokes,items){return globalThis.appInk.pdf.make(pdf,{rect:el.getBoundingClientRect(),width:nbSize(el).w,box,d},strokes,items.filter(i=>i.type==='text'));}
+// Lets go of them over the PDF page: off the notebook page and onto that one, one step to undo. False when nothing went.
+function nbSendToPdf(el,pdf,box,d,strokeIds,itemIds){
+  const page=nbPage(el.dataset.pageId);if(!page)return false;
+  const strokes=page.strokes.filter(st=>strokeIds.includes(st.id)),items=page.items.filter(i=>itemIds.includes(i.id)&&i.type==='text');if(!strokes.length&&!items.length)return false;
+  const job=globalThis.appInk.pdf.job(pdf,nbForPdf(el,pdf,box,d,strokes,items)),gone=new Set([...strokes,...items].map(x=>x.id));
+  if(nbChange('옮기기',()=>{page.strokes=page.strokes.filter(st=>!gone.has(st.id));page.items=page.items.filter(i=>!gone.has(i.id));},{undo:job.undo,redo:job.redo})!==true)return false; // i18n:keep — the undo label (not shown)
+  job.run();return true;
+}
 function nbSelectionPreview(p,page){
   const sel=nb.sel;
   // The selection let go of mid-drag (Esc, undo): every page the drag drew on is drawn again from what it holds.
@@ -411,7 +442,16 @@ function nbSelectionPreview(p,page){
   // A lasso selection being moved is drawn where it will land: its strokes on that page's canvas (not on the page
   // they were on), its boxes and the selection's box on that page.
   if(p.kind==='shift'){
-    const plan=nbDrop(p.el,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],p.client),list=p.el.closest('.nb-pages')||document;
+    const list=p.el.closest('.nb-pages')||document,moving=page.items.filter(i=>sel.items.includes(i.id)),node=i=>list.querySelector(`.nb-item[data-item-id="${CSS.escape(i.id)}"]`),pdf=globalThis.appInk.pdf.at(...p.client);
+    // Over a PDF page beside the notebook: shown there (what can go), and not on the notebook page.
+    if(pdf){
+      if(p.shown&&p.shown!==p.el)nbDrawPage(p.shown);p.shown=p.el;nbPaint(p.el,page.strokes.filter(st=>!sel.strokes.includes(st.id)));
+      for(const i of moving)if(i.type==='text'){const n=node(i);if(n)n.style.visibility='hidden';}
+      const frame=list.querySelector('.nb-selection');if(frame)frame.hidden=true;
+      globalThis.appInk.pdf.preview(pdf,nbForPdf(p.el,pdf,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],page.strokes.filter(st=>sel.strokes.includes(st.id)),moving));return;
+    }
+    globalThis.appInk.pdf.preview(null);for(const i of moving){const n=node(i);if(n)n.style.visibility='';}{const frame=list.querySelector('.nb-selection');if(frame)frame.hidden=false;}
+    const plan=nbDrop(p.el,sel.box,[p.last[0]-p.start[0],p.last[1]-p.start[1]],p.client);
     if(p.shown&&p.shown!==plan.el&&p.shown!==p.el)nbDrawPage(p.shown);p.shown=plan.el;
     if(plan.el===p.el)nbPaint(p.el,page.strokes.map(st=>sel.strokes.includes(st.id)?nbMoved(st,plan.map,1):st));
     else{nbPaint(p.el,page.strokes.filter(st=>!sel.strokes.includes(st.id)));nbPaint(plan.el,[...plan.page.strokes,...page.strokes.filter(st=>sel.strokes.includes(st.id)).map(st=>nbMoved(st,plan.map,1))]);}
@@ -765,6 +805,21 @@ dialog.addEventListener('wheel',event=>{
   if(performance.now()-nbWheelAt<450)return;nbWheelAt=performance.now();input.value=next;
   runDesktop(async()=>{await nbFigureLoad();box.scrollTop=down?0:box.scrollHeight;})();
 },{passive:false});
+// Ctrl+C on what is chosen on a notebook page (a lasso selection, a line or shape pressed with the select tool, a text
+// box): its strokes and text boxes, as desktop/ink.js carries them (points from the top-left of their box). Memo cards,
+// pictures and source cards are not copied.
+document.addEventListener('copy',event=>{
+  const clipboard=globalThis.appInk.clip;
+  if(event.defaultPrevented||state.screen!=='reader'||state.mode!=='notebook'||!nb.doc||dialog.open||clipboard.typing(event.target)||String(window.getSelection()||'').trim())return;
+  let strokes=[],items=[];
+  if(nb.sel){const page=nbPage(nb.sel.pageId);if(page){strokes=page.strokes.filter(st=>nb.sel.strokes.includes(st.id));items=page.items.filter(i=>nb.sel.items.includes(i.id)&&i.type==='text');}}
+  else if(nbFocus){for(const page of nb.doc.pages)items.push(...page.items.filter(i=>i.id===nbFocus&&i.type==='text'));}
+  if(!strokes.length&&!items.length)return;
+  const boxes=[...strokes.map(nbStrokeBox),...items.map(nbItemBox)],x0=Math.min(...boxes.map(b=>b.x0)),y0=Math.min(...boxes.map(b=>b.y0)),x1=Math.max(...boxes.map(b=>b.x1)),y1=Math.max(...boxes.map(b=>b.y1));
+  clipboard.put(event,{w:x1-x0,h:y1-y0,
+    strokes:strokes.map(st=>{const points=[...st.points];for(let i=0;i<points.length;i+=4){points[i]=nbRound(points[i]-x0);points[i+1]=nbRound(points[i+1]-y0);}return {tool:st.tool,color:st.color,width:st.width,points,...(st.shape?{shape:st.shape}:{})};}),
+    items:items.map(({id,mentions,...i})=>({...i,x:i.x-x0,y:i.y-y0}))});
+});
 // A picture pasted into the notebook (not into a text box) goes on the page in view, fitted to it.
 document.addEventListener('paste',event=>{
   if(state.screen!=='reader'||state.mode!=='notebook'||!nb.doc||dialog.open||event.target.closest?.('textarea,input,[contenteditable="true"]'))return;

@@ -110,8 +110,8 @@ const root = path.resolve(__dirname, '..');
     // the pin opens it by click and by keyboard and moves by dragging. No separate pin button remains.
     assert.equal(await p.locator('[data-memo-pin-new]').count(), 0, 'no pin button in the original toolbar');
     await p.evaluate(() => document.activeElement?.blur());
-    await p.keyboard.press('Control+7'); assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'text');
-    await p.keyboard.press('Control+7'); assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'memo', 'Ctrl+7 again: the memo pin');
+    await p.keyboard.press('ControlOrMeta+7'); assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'text');
+    await p.keyboard.press('ControlOrMeta+7'); assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'memo', 'Ctrl+7 again: the memo pin');
     assert.match(await p.locator('.ink-tools [data-ink-tool="memo"]').getAttribute('data-tip'), /^메모 · .*Ctrl\+7$/);
     await p.evaluate(() => goToPage(2)); await p.waitForTimeout(300);
     const page2 = p.locator('.original-pages .page[data-page-number="2"]'); const pb = await page2.boundingBox();
@@ -201,7 +201,7 @@ const root = path.resolve(__dirname, '..');
     const [child] = await Promise.all([app.waitForEvent('window'), p.locator(`.memo-card.open [data-memo-window]`).click()]);
     await child.locator('.md-live .cm-content').waitFor(); assert.equal(await child.locator('#note-editor').inputValue(), '다듬은 메모\n\n- 하나');
     assert.ok(await child.locator('.md-toolbar [data-md]').count() >= 15, 'the formatting tools'); assert.equal(await child.locator('.md-toolbar [data-editor-ai]').count(), 1); assert.equal(await child.locator('.editor-title').inputValue(), '2쪽 메모');
-    await child.locator('.md-live .cm-content').click(); await child.keyboard.press('Control+A'); await child.keyboard.type('창에서 고친 메모 $x^2$ (p. 2)');
+    await child.locator('.md-live .cm-content').click(); await child.keyboard.press('ControlOrMeta+A'); await child.keyboard.type('창에서 고친 메모 $x^2$ (p. 2)');
     await p.waitForFunction(k => notes[k] === '창에서 고친 메모 $x^2$ (p. 2)', key);
     await child.locator('.md-live .cm-math .katex').first().waitFor();
     // The app's editors take the text once typing pauses (not on every key).
@@ -283,7 +283,7 @@ const root = path.resolve(__dirname, '..');
     done.push('notebook memo card: title and line, opens in place to write, Esc, drag, wide editor, deletion');
     // On a notebook page the Ctrl+7 memo tool pins a new memo where the page is pressed (a pin, as on the source) and opens it.
     const cards = await p.locator('.nb-memo-card').count();
-    await p.evaluate(() => document.activeElement?.blur()); await p.keyboard.press('Control+7'); if (await p.evaluate(() => globalThis.appInk.tool) !== 'memo') await p.keyboard.press('Control+7');
+    await p.evaluate(() => document.activeElement?.blur()); await p.keyboard.press('ControlOrMeta+7'); if (await p.evaluate(() => globalThis.appInk.tool) !== 'memo') await p.keyboard.press('ControlOrMeta+7');
     assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'memo');
     await p.locator('.nb-page').first().scrollIntoViewIfNeeded(); const nbPage = await p.locator('.nb-page').first().boundingBox(); await p.mouse.click(nbPage.x + nbPage.width * .6, nbPage.y + nbPage.height * .7);
     const nbPin = p.locator('.nb-page .nb-pin'); await nbPin.waitFor(); assert.equal(await p.locator('.nb-memo-card').count(), cards, 'no card added');

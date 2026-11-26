@@ -28,7 +28,7 @@ const root = path.resolve(__dirname, '..');
   const board = p => p.locator('.nb-page[data-board]').first();
   const boardHeight = p => board(p).evaluate(el => Number(el.dataset.h));
   const saved = async () => { const dir = path.join(vault, appName.vaultDir, 'notebooks'); const name = (await fs.readdir(dir)).find(n => n.endsWith('.json')); return JSON.parse(await fs.readFile(path.join(dir, name), 'utf8')); };
-  const settle = p => p.waitForFunction(() => document.querySelector('.nb-status')?.textContent.includes('저장됨') || document.querySelector('.nb-status')?.textContent.includes('saved'));
+  const settle = p => p.waitForFunction(() => document.querySelector('.nb-status')?.dataset.state === 'saved' || document.querySelector('.nb-status')?.textContent.includes('saved'));
   // The board's ⋯ menu, its top in view first.
   const boardMenu = async p => { await board(p).evaluate(el => el.closest('.nb-page-wrap').scrollIntoView({ block: 'start' })); await board(p).evaluate(el => el.closest('.nb-page-wrap').querySelector('[data-nb-page-menu]').click()); await p.locator('.nb-page-menu').waitFor(); };
   // A pen stroke at page points (x, y) to (x + 60, y + 10) on the whiteboard, scrolled into view first.
@@ -59,8 +59,8 @@ const root = path.resolve(__dirname, '..');
     await p.evaluate(() => { const page = nb.doc.pages.find(x => x.board); nbChange('이동', () => page.items.push({ id: nbId(), type: 'text', x: 60, y: 2450, w: 200, h: 40, text: '아래 상자' })); nbRender(); });
     await p.waitForFunction(() => Number(document.querySelector('.nb-page[data-board]').dataset.h) === 3368);
     // One undo takes the box and the growth back.
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => Number(document.querySelector('.nb-page[data-board]').dataset.h) === 2526);
-    await p.keyboard.press('Control+y'); await p.waitForFunction(() => Number(document.querySelector('.nb-page[data-board]').dataset.h) === 3368);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => Number(document.querySelector('.nb-page[data-board]').dataset.h) === 2526);
+    await p.keyboard.press('ControlOrMeta+y'); await p.waitForFunction(() => Number(document.querySelector('.nb-page[data-board]').dataset.h) === 3368);
     await settle(p);
     let stored = (await saved()).pages.find(x => x.board); assert.equal(stored.height, 3368); assert.equal(stored.strokes.length, 3);
 
@@ -93,7 +93,7 @@ const root = path.resolve(__dirname, '..');
     assert.equal(await plus.getAttribute('aria-label'), '같은 폭의 새 화이트보드 추가');
     await plus.click(); await p.waitForFunction(() => nb.doc.pages.length === 4);
     assert.deepEqual(await p.evaluate(() => { const pg = nb.doc.pages.at(-1); return [pg.board, pg.width, pg.height, pg.items.length + pg.strokes.length]; }), [true, 595, 842, 0]);
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => nb.doc.pages.length === 3);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => nb.doc.pages.length === 3);
     // At the 500 pages a notebook holds, the + is off and says why.
     assert.match(await p.evaluate(() => { const pages = nb.doc.pages; nb.doc.pages = Array.from({ length: 500 }, () => pages[0]); const html = nbAddSameHtml(); nb.doc.pages = pages; return html; }), /disabled title="노트북에는 500쪽까지 넣을 수 있습니다\."/);
     await settle(p);

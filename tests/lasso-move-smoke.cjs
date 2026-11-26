@@ -76,7 +76,7 @@ const root = path.resolve(__dirname, '..');
     assert.equal(await anyInk('.nb-page', 0), 0, 'page 1 has no ink left');
     assert.equal(await p.evaluate(() => document.querySelectorAll('.nb-page')[0].querySelectorAll('.nb-item').length), 0, 'page 1 has no box left');
     // One undo puts both back on page 1, where they were.
-    await p.mouse.click(...at(b2, .9, .95)); await p.keyboard.press('Control+z');
+    await p.mouse.click(...at(b2, .9, .95)); await p.keyboard.press('ControlOrMeta+z');
     await p.waitForFunction(() => nb.doc.pages[0].strokes.length === 1 && nb.doc.pages[0].items.length === 1 && !nb.doc.pages[1].strokes.length && !nb.doc.pages[1].items.length);
     after = await nbState();
     assert.deepEqual(after[0].strokes.map(s => s.points), before[0].strokes.map(s => s.points), 'the stroke is back where it was');
@@ -126,7 +126,7 @@ const root = path.resolve(__dirname, '..');
     assert.equal(await anyInk('.original-pages .page', 0), 0, 'nothing left drawn on page 1');
     assert.ok(await p.evaluate(() => inkState.selection?.page === 1 && !!document.querySelector('.original-pages .page[data-page="2"] .ink-selection')), 'the selection moved with them');
     // One undo puts both back on page 1.
-    await p.keyboard.press('Escape'); await p.keyboard.press('Control+z');
+    await p.keyboard.press('Escape'); await p.keyboard.press('ControlOrMeta+z');
     await p.waitForFunction(() => [...document.querySelector('.original-pages').inkDoc.strokes.values()].every(s => s.page === 0));
     assert.deepEqual((await pdfState()).map(s => s.id).sort(), pdfBefore.map(s => s.id).sort(), 'the originals are back');
     // A move within a page is as before: a new id, `from` the old one, the same page.

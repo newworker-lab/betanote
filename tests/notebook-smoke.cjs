@@ -53,14 +53,14 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     const page = p.locator('.nb-page').first(), box = await page.boundingBox();
     await p.mouse.move(box.x + box.width * .2, box.y + box.height * .3); await p.mouse.down();
     for (let i = 1; i <= 10; i++) await p.mouse.move(box.x + box.width * (.2 + .04 * i), box.y + box.height * .32);
-    await p.mouse.up(); await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    await p.mouse.up(); await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
     await drawn(p, 0);
     await p.locator('[data-ink-undo]').click(); await p.waitForFunction(() => { const c = document.querySelector('.nb-page .nb-ink'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return false; return true; });
     await p.locator('[data-ink-redo]').click(); await drawn(p, 0);
     // A highlighter stroke is painted once when lifted: no leftover preview frame paints it again (twice as dark).
     await p.locator('[data-ink-tool="highlighter"]').click(); await p.mouse.move(box.x + box.width * .2, box.y + box.height * .6); await p.mouse.down();
     for (let i = 1; i <= 10; i++) await p.mouse.move(box.x + box.width * (.2 + .04 * i), box.y + box.height * .6);
-    await p.mouse.up(); await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor(); await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await p.mouse.up(); await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' }); await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const alpha = await p.evaluate(() => { const c = document.querySelector('.nb-page .nb-ink'), y = Math.round(c.height * .6), d = c.getContext('2d').getImageData(0, y, c.width, 1).data; let m = 0; for (let i = 3; i < d.length; i += 4) m = Math.max(m, d[i]); return m; });
     assert.ok(alpha > 60 && alpha < 110, 'one layer of highlighter, alpha ' + alpha);
     await p.locator('[data-ink-undo]').click(); await p.locator('[data-ink-tool="pen"]').click();
@@ -85,7 +85,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.evaluate(() => nbSetZoom(1)); assert.ok(Math.abs(await zoomOf() - 1) < .01, 'back to the pane width');
     // The shape tool draws on notebook pages too (a pen stroke through the corners); one undo takes it away.
     await p.locator('[data-ink-tool="shape"]').click(); await p.mouse.move(box.x + box.width * .3, box.y + box.height * .6); await p.mouse.down(); await p.mouse.move(box.x + box.width * .5, box.y + box.height * .7, { steps: 4 }); await p.mouse.up();
-    await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
     assert.deepEqual(await p.evaluate(() => nb.doc.pages[0].strokes.filter(s => s.shape).map(s => [s.tool, s.shape, s.points.length / 4])), [['pen', 'rect', 5]]);
     await p.locator('[data-ink-undo]').click(); await p.waitForFunction(() => !nb.doc.pages[0].strokes.some(s => s.shape));
     // The shape chosen in the menu is the one drawn (the notebook read the first choice before).
@@ -104,7 +104,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('[data-ink-undo]').click(); await p.waitForFunction(n => nb.doc.pages[0].strokes.length === n, before);
     // Every PDF ink tool works on notebook pages. The lasso selects the pen line; it moves, takes a
     // palette colour, scales from its corner, duplicates and deletes, each one undo step.
-    const at = (x, y) => [box.x + box.width * x, box.y + box.height * y], saved = () => p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    const at = (x, y) => [box.x + box.width * x, box.y + box.height * y], saved = () => p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
     const nbStrokes = () => p.evaluate(() => nb.doc.pages[0].strokes.map(s => { let y0 = Infinity; for (let i = 1; i < s.points.length; i += 4) y0 = Math.min(y0, s.points[i]); return { id: s.id, color: s.color, width: s.width, y0, n: s.points.length / 4 }; }));
     const loop = async (y0, y1) => { await p.mouse.move(...at(.12, y0)); await p.mouse.down(); for (const pt of [[.75, y0], [.75, y1], [.12, y1], [.12, y0 + .01]]) await p.mouse.move(...at(...pt), { steps: 4 }); await p.mouse.up(); await p.locator('.nb-selection').waitFor(); };
     await p.locator('[data-ink-tool="lasso"]').click(); await loop(.22, .42);
@@ -179,11 +179,11 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('.ink-text-bar [data-tb="bold"]').click(); await p.locator('.ink-text-bar [data-tb="size"]').selectOption('20');
     await p.locator('.ink-text-bar [data-tb="color"]').click(); await p.locator('.ink-text-pop').filter({ hasText: '텍스트 색상' }).waitFor(); assert.equal(await p.locator('.ink-text-pop .ink-text-row.pen [data-tb-color]').count() >= 4, true, 'pen colours in the notebook panel too'); await p.locator('.ink-text-pop [data-tb-color="#9f1239"]').click(); await p.locator('.ink-text-pop').waitFor({ state: 'detached' });
     await p.locator('.ink-text-bar [data-tb="align"]').click(); assert.ok(await boxNode.locator('textarea').evaluate(a => a === document.activeElement), 'the text keeps its focus');
-    await p.keyboard.press('Control+i');
+    await p.keyboard.press('ControlOrMeta+i');
     const styled = await textItem(); assert.deepEqual([styled.bold, styled.italic, styled.size, styled.color, styled.align], [true, true, 20, '#9f1239', 'center']);
     assert.equal(await boxNode.locator('textarea').evaluate(a => [getComputedStyle(a).fontWeight, getComputedStyle(a).fontStyle, getComputedStyle(a).textAlign].join()), '700,italic,center');
     // Lists as on PDF pages; numbers set by the list are saved with the box.
-    const textBefore = styled.text; await p.keyboard.press('Control+End'); await p.keyboard.press('Enter'); await p.locator('.ink-text-bar [data-tb="list"]').click(); await p.locator('.ink-text-pop [data-tb-list="number"]').click();
+    const textBefore = styled.text; await p.keyboard.press((process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')); await p.keyboard.press('Enter'); await p.locator('.ink-text-bar [data-tb="list"]').click(); await p.locator('.ink-text-pop [data-tb-list="number"]').click();
     await p.keyboard.type('하나'); await p.keyboard.press('Enter'); await p.keyboard.type('둘');
     assert.equal((await textItem()).text, textBefore + '\n1. 하나\n2. 둘', 'the list is saved as typed');
     await p.evaluate(() => globalThis.appInk.setTool('pen')); await boxNode.locator('textarea').focus(); await p.keyboard.press('Escape');
@@ -213,7 +213,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('[data-nb-page-menu]').first().click(); assert.deepEqual(await p.locator('.nb-page-menu [role^="menuitem"]').allInnerTexts(), ['줄', '격자', '빈', '복제', '위로 옮기기', '아래로 옮기기', '삭제']); assert.equal(await p.locator('.nb-page-menu [data-nb-page="up"]').isDisabled(), true);
     await p.locator('.nb-page-menu [data-nb-page="dup"]').click(); await p.locator('[data-nb-page-menu]').first().click(); await p.locator('.nb-page-menu [data-nb-page="down"]').click();
     assert.deepEqual(await p.locator('.nb-page').evaluateAll(n => n.map(e => e.dataset.template)), ['lined', 'lined', 'grid']);
-    await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
 
     // Exports: notebook PDF with three pages, notes as Markdown.
     await app.evaluate((_, f) => globalThis.saveQueue.push(f), path.join(temp, 'notebook.pdf')); await (await toolShown(p, '[data-nb-save-menu]')).click(); await p.locator('.pop-menu [data-action="nb-export"]').click();
@@ -252,7 +252,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     const items = await p.locator('.nb-item').count();
     await p.evaluate(async () => { const c = document.createElement('canvas'); c.width = 40; c.height = 20; c.getContext('2d').fillRect(0, 0, 40, 20); const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'x.png', { type: 'image/png' })); document.querySelector('.nb-pages').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true })); });
     await p.locator('#toast').filter({ hasText: '그림을 노트북에 넣었습니다' }).waitFor(); assert.equal(await p.locator('.nb-item').count(), items + 1);
-    await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
     await app.evaluate((_, f) => globalThis.saveQueue.push(f), path.join(temp, 'notebook-sizes.pdf')); await (await toolShown(p, '[data-nb-save-menu]')).click(); await p.locator('.pop-menu [data-action="nb-export"]').click();
     const sizes = (await PDFDocument.load(await waitFile(path.join(temp, 'notebook-sizes.pdf')))).getPages().map(pg => pg.getSize()).map(s => `${Math.round(s.width)}x${Math.round(s.height)}`);
     assert.deepEqual(sizes, ['595x842', '595x842', '595x842', '420x595', '283x425', '600x800', '600x800'], 'each page prints at its own size');
@@ -264,7 +264,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     assert.equal(await plus.getAttribute('aria-label'), '같은 양식의 페이지 추가');
     const pagesBefore = await pageList(); await plus.click(); await p.waitForFunction(n => nb.doc.pages.length === n + 1, pagesBefore.length);
     assert.equal((await pageList()).at(-1), 'blank 600x800 0', 'after a page from a PDF: an empty page of its size');
-    await p.keyboard.press('Control+z'); await p.waitForFunction(n => nb.doc.pages.length === n, pagesBefore.length);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(n => nb.doc.pages.length === n, pagesBefore.length);
     // After a lined A5 page: another lined A5 page, empty (the one before keeps what is on it), in view.
     await (await toolShown(p, '[data-nb-add]')).click(); await p.locator('.nb-add-menu [name="nb-new-template"][value="lined"]').check(); await p.locator('.nb-add-menu .nb-size').selectOption('a5'); await p.locator('.nb-add-menu [data-action="nb-add-page"]').click();
     await p.waitForFunction(n => nb.doc.pages.length === n + 1, pagesBefore.length);
@@ -277,7 +277,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     for (let i = 0; i < 40 && !await p.evaluate(() => document.activeElement?.matches('.nb-add-same')); i++) await p.keyboard.press('Tab');
     assert.equal(await p.evaluate(() => document.activeElement?.matches('.nb-add-same')), true, 'Tab reaches the +');
     await p.keyboard.press('Enter'); await p.waitForFunction(n => nb.doc.pages.length === n + 3, pagesBefore.length);
-    await p.locator('.nb-status').filter({ hasText: '노트북 저장됨' }).waitFor();
+    await p.locator('.nb-status[data-state="saved"]').waitFor({ state: 'attached' });
     const added = await pageList();
     await app.close(); app = null;
     // Kept after a restart.

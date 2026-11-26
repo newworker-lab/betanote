@@ -79,8 +79,8 @@ const root = path.resolve(__dirname, '..');
     assert.deepEqual((await inkAt(p, 'padding')).slice(0, 3), [255, 243, 191], 'the fill is drawn around the text');
     assert.equal((await inkAt(p, 'outside'))[3], 0, 'nothing outside the box');
     // One Ctrl+Z takes the look back, Ctrl+Shift+Z brings it again (as any other format change of the box).
-    await p.keyboard.press('Control+z'); await saved(p); assert.deepEqual((await boxes(p)).map(b => [b.fill, b.border]), [[undefined, undefined]]);
-    await p.keyboard.press('Control+Shift+z'); await saved(p); assert.deepEqual((await boxes(p)).map(b => b.fill), ['#fff3bf']);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); assert.deepEqual((await boxes(p)).map(b => [b.fill, b.border]), [[undefined, undefined]]);
+    await p.keyboard.press('ControlOrMeta+Shift+z'); await saved(p); assert.deepEqual((await boxes(p)).map(b => b.fill), ['#fff3bf']);
     // A width or a line chosen on a box without a border gives it one in the text's colour; 없음 takes both away.
     await p.mouse.dblclick(...at(.31, .405)); await editor.locator('textarea').waitFor(); await p.locator('.ink-text-bar [data-tb="box"]').click(); await panel.waitFor();
     await panel.locator('[data-tb-look="borderColor"][data-value="none"]').click(); await panel.locator('[data-tb-look="fill"][data-value="none"]').click();
@@ -103,7 +103,7 @@ const root = path.resolve(__dirname, '..');
     assert.equal(scaled.width, 6); assert.ok(Math.abs(scaled.ratio[0] - scaled.ratio[1]) < .02, JSON.stringify(scaled));
     assert.equal(scaled.border[1], Math.round(scaled.border[0] * 6 / 24 * 10) / 10, 'the border follows the size the text got');
     assert.ok(Math.abs(scaled.boxWidth - scaled.textBox) < .01 && Math.abs(scaled.measured - scaled.w) < 1, JSON.stringify(scaled));
-    await saved(p); await p.keyboard.press('Control+z'); await saved(p);
+    await saved(p); await p.keyboard.press('ControlOrMeta+z'); await saved(p);
     // A second new box starts plain again (the look is never carried over; the text colour is).
     await p.locator('[data-ink-tool="text"]').click(); await p.mouse.click(...at(.3, .7)); await editor.locator('textarea').waitFor();
     assert.deepEqual(await editor.evaluate(n => { const s = getComputedStyle(n); return [s.backgroundColor, s.borderTopWidth]; }), ['rgba(0, 0, 0, 0)', '0px']);
@@ -163,8 +163,8 @@ const root = path.resolve(__dirname, '..');
     assert.deepEqual(await area.evaluate(n => { const s = getComputedStyle(n); return [s.backgroundColor, s.borderTopStyle, s.borderTopColor, s.boxSizing]; }), ['rgb(211, 249, 216)', 'dotted', 'rgb(224, 49, 49)', 'border-box']);
     await p.locator('.ink-text-bar [data-tb="done"]').click(); await panel.waitFor({ state: 'detached' });
     assert.deepEqual(await item(), { fill: '#d3f9d8', border: { color: '#e03131', width: 1.5, style: 'dotted' }, text: '노트 상자' });
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => !nb.doc.pages[0].items.find(x => x.type === 'text').fill);
-    await p.keyboard.press('Control+Shift+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#d3f9d8');
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => !nb.doc.pages[0].items.find(x => x.type === 'text').fill);
+    await p.keyboard.press('ControlOrMeta+Shift+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#d3f9d8');
     // A colour of one's own (the system's colour dialog takes the focus from the box while open) stays in the box's one
     // undo step, for the text, the fill and the border alike.
     const pickOwn = (selector, value) => p.locator(selector).evaluate((n, v) => { n.focus(); n.value = v; n.dispatchEvent(new Event('change', { bubbles: true })); }, value);
@@ -176,9 +176,9 @@ const root = path.resolve(__dirname, '..');
     await p.locator('.ink-text-bar [data-tb="color"]').click(); await pickOwn('.ink-text-pop [data-tb-custom]', '#654321');
     await p.locator('.ink-text-bar [data-tb="done"]').click();
     assert.deepEqual(await look(), { color: '#654321', fill: '#abcdef', border: '#123456' });
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#d3f9d8');
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#d3f9d8');
     assert.deepEqual(await look(), { color: undefined, fill: '#d3f9d8', border: '#e03131' }, 'one undo takes the whole editing back');
-    await p.keyboard.press('Control+Shift+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#abcdef');
+    await p.keyboard.press('ControlOrMeta+Shift+z'); await p.waitForFunction(() => nb.doc.pages[0].items.find(x => x.type === 'text').fill === '#abcdef');
     assert.deepEqual(await look(), { color: '#654321', fill: '#abcdef', border: '#123456' }, 'and redo brings all of it again');
     // A notebook box edited and finished keeps its letters in place too (the same text area, read only or not), and its
     // text scrolled past its height stays where it was.

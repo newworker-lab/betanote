@@ -708,7 +708,7 @@ function inkGesture(container,view,canvas,event,tool,mode){
   // The page's place is read at every event: the pane may scroll (wheel) during the gesture.
   const at=e=>{const rect=view.div.getBoundingClientRect();return [(e.clientX-rect.left)*view.viewport.width/rect.width,(e.clientY-rect.top)*view.viewport.height/rect.height];},start=at(event);
   canvas.setPointerCapture(event.pointerId);
-  document.body.classList.toggle('ink-grabbing',mode==='move');
+  inkGrabbing(mode==='move',canvas);
   inkStroke={container,view,canvas,doc:container.inkDoc,tool,mode,pointerId:event.pointerId,device:event.pointerType,lastAt:event.timeStamp,startView:start,path:[start],client:[event.clientX,event.clientY],points:[],erased:new Map(),slop:tool==='read'?4:1};
   inkStroke.shift=event.shiftKey;
   const move=e=>{if(e.pointerId!==inkStroke?.pointerId)return;if(!e.buttons){detach();inkGestureEnd();return;}inkStroke.lastAt=e.timeStamp;inkStroke.shift=e.shiftKey;inkStroke.path.push(at(e));inkStroke.client=[e.clientX,e.clientY];(inkStroke.mode==='move'?inkMoveLive(inkStroke):inkLiveOf(inkStroke)).request();};
@@ -717,6 +717,109 @@ function inkGesture(container,view,canvas,event,tool,mode){
   inkStroke.detach=detach;
   canvas.addEventListener('pointermove',move);for(const type of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(type,up);
 }
+// ---- Notebook ink onto a PDF page ----
+// The other way of inkSendToNotebook: what is dragged off a notebook page and let go over a PDF pane beside it becomes
+// that page's ink (desktop/notebook.js asks through appInk.pdf). Pen and highlighter lines and shapes become strokes,
+// text boxes become text boxes; sizes are kept in points; the box of what is moved is kept inside the page.
+let inkPdfGhost=null;
+globalThis.appInk.pdf={
+  // The PDF page that would take ink let go at this point: the nearest drawn page of the pane under it.
+  at(cx,cy){
+    if(inkViewOnly())return null;
+    for(const c of inkPanes){
+      if(!c.isConnected){inkPanes.delete(c);continue;}
+      const r=c.getBoundingClientRect();if(!(r.width>0&&cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom)||!c.inkDoc||c.inkDoc.stale)continue;
+      let view=null,best=Infinity;for(const v of inkPageViews(c)){const q=v.div.getBoundingClientRect(),d=Math.hypot(Math.max(q.left-cx,0,cx-q.right),Math.max(q.top-cy,0,cy-q.bottom));if(d<best){best=d;view=v;if(!d)break;}}
+      if(view)return {container:c,view};
+    }
+    return null;
+  },
+  // from: the notebook page on screen (rect), its width in points, the box of what is moved (points) and the drag (points).
+  make(t,from,strokes,items){
+    const vp=t.view.viewport,u=inkScale(vp),b=t.view.div.getBoundingClientRect(),{rect:a,width:W,box,d}=from,r2=n=>Math.round(n*100)/100;
+    const w=(box.x1-box.x0)*u,h=(box.y1-box.y0)*u,x0=(a.left+(box.x0+d[0])/W*a.width-b.left)*vp.width/b.width,y0=(a.top+(box.y0+d[1])/W*a.width-b.top)*vp.height/b.height;
+    const nx=w>=vp.width?0:Math.min(Math.max(x0,0),vp.width-w),ny=h>=vp.height?0:Math.min(Math.max(y0,0),vp.height-h);
+    const point=(x,y)=>vp.convertToPdfPoint((x-box.x0)*u+nx,(y-box.y0)*u+ny).map(r2),page=t.view.id-1,createdAt=new Date().toISOString(),marks=globalThis.appInkMarks,out=[];
+    for(const st of strokes){const points=[...st.points];for(let i=0;i<points.length;i+=4){const [x,y]=point(points[i],points[i+1]);points[i]=x;points[i+1]=y;}
+      out.push({id:inkId(),page,tool:st.tool,color:st.color,width:st.width,points,...(st.shape?{shape:st.shape}:{}),createdAt});}
+    for(const it of items){const size=Math.min(72,Math.max(6,Number.isFinite(it.size)?it.size:12)),look=marks.textLook(it),pad=marks.textBoxFrame({width:size,border:look.border}).out,[x,y]=point(it.x+pad,it.y+pad);
+      out.push({id:inkId(),page,tool:'text',color:marks.hexColor(it.color)||'#111827',width:size,points:[x,y,0,0],text:it.text,...(it.bold?{bold:true}:{}),...(it.italic?{italic:true}:{}),...(it.underline?{underline:true}:{}),...(it.align&&it.align!=='left'?{align:it.align}:{}),...(look.fill?{fill:look.fill}:{}),...(look.border?{border:{...look.border}}:{}),createdAt});
+      // The box is as wide as its text, as one typed on the PDF is. It keeps the notebook box's width only when the text
+      // needs it to wrap as it did there (a box wider than its text would stand with empty room at its right).
+      const made=out.at(-1),room=Math.round((it.w-2*pad)*10)/10;if(inkTextWidth(made)>room+1)made.w=Math.max(12,room);}
+    return out;
+  },
+  // What make() gave, drawn on the page while it is dragged (null ends it).
+  preview(t,strokes){
+    if(inkPdfGhost&&inkPdfGhost.view!==t?.view){inkPdfGhost.live.end();inkPdfGhost=null;}
+    if(!t)return;
+    if(!inkPdfGhost){const v=t.view,ghost=inkPdfGhost={view:v,strokes};ghost.live=inkLivePreview(v.div,()=>v.viewport,(ctx,k)=>{for(const st of [...ghost.strokes].sort((a,b)=>(a.tool==='highlighter'?0:1)-(b.tool==='highlighter'?0:1)))inkPaint(ctx,st,v.viewport,k);});}
+    inkPdfGhost.strokes=strokes;inkPdfGhost.live.request();
+  },
+  // Adding them (run), and taking them off and putting them back for the notebook's one undo step.
+  job(t,strokes){
+    const doc=t.container.inkDoc,pages=new Set([t.view.id-1]),ids=strokes.map(st=>st.id),geometry=inkGeometry(t.view);
+    return {run(){for(const st of strokes)doc.strokes.set(st.id,st);inkQueueMany(doc,strokes.map(stroke=>({type:'add',stroke,geometry})));inkRedraw(doc,pages);},
+      undo(){for(const id of ids)doc.strokes.delete(id);inkQueueMany(doc,[{type:'delete',ids}]);inkState.selection=null;document.querySelectorAll('.ink-selection').forEach(n=>n.remove());inkTextSelect(null);inkRedraw(doc,pages);},
+      redo(){for(const st of strokes)doc.strokes.set(st.id,st);inkQueueMany(doc,[{type:'restore',ids}]);inkRedraw(doc,pages);}};
+  },
+};
+// ---- Copy and paste (Ctrl+C, Ctrl+V) ----
+// What is chosen on a PDF page (a lasso selection, a line or shape pressed with the select tool, a text box) or on a
+// notebook page (desktop/notebook.js) is copied as the notebook's own shapes: strokes and text items in points, from
+// the top-left of their box. Pasted, it lands under the pointer on the PDF page or notebook page there (in the middle
+// of the page in view when the pointer is over neither), chosen, as one step to undo. It is carried on the clipboard
+// under its own type, with the text of its boxes as plain text for other programs. Marks on the PDF's words are not
+// copied (they belong to those words).
+const INK_CLIP='application/x-app-ink';
+let inkPointerAt=null;document.addEventListener('pointermove',event=>{inkPointerAt=[event.clientX,event.clientY];},true);
+const inkTyping=target=>Boolean(target?.closest?.('input,select,[contenteditable="true"],.cm-editor'))||Boolean(target?.closest?.('textarea'))&&!target.closest('textarea').readOnly;
+globalThis.appInk.clip={
+  type:INK_CLIP,typing:inkTyping,
+  put(event,clip){event.preventDefault();event.clipboardData.setData(INK_CLIP,JSON.stringify(clip));event.clipboardData.setData('text/plain',clip.items.map(i=>i.text).join('\n'));toast(tr('복사했습니다.'));},
+  read(event){
+    const raw=event.clipboardData?.getData(INK_CLIP);if(!raw)return null;
+    try{const c=JSON.parse(raw);return c&&Array.isArray(c.strokes)&&Array.isArray(c.items)&&c.strokes.length+c.items.length>0&&c.strokes.length<=2000&&c.items.length<=200&&Number.isFinite(c.w)&&Number.isFinite(c.h)?c:null;}catch{return null;}
+  },
+};
+document.addEventListener('copy',event=>{
+  if(event.defaultPrevented||state.screen!=='reader'||dialog.open||inkTyping(event.target)||String(window.getSelection()||'').trim())return;
+  let view=null,strokes=[];const sel=inkState.selection;
+  if(sel?.container.isConnected&&sel.doc===sel.container.inkDoc){view=sel.container.pdfViewer?.getPageView(sel.page);strokes=sel.ids.map(id=>sel.doc.strokes.get(id)).filter(Boolean);}
+  else if(inkTextLast&&!inkTextTarget&&inkTextLast.container.isConnected){view=inkTextLast.view;const st=inkTextLast.container.inkDoc?.strokes.get(inkTextLast.id);if(st)strokes=[st];}
+  strokes=strokes.filter(st=>st.tool!=='mark');if(!view||!strokes.length)return;
+  const vp=view.viewport,u=inkScale(vp),boxes=strokes.map(st=>inkBox(st,vp)),box={x0:Math.min(...boxes.map(b=>b.x0)),y0:Math.min(...boxes.map(b=>b.y0)),x1:Math.max(...boxes.map(b=>b.x1)),y1:Math.max(...boxes.map(b=>b.y1))};
+  const made=inkForNotebook(strokes,view,{point:([x,y])=>[(x-box.x0)/u,(y-box.y0)/u]});
+  globalThis.appInk.clip.put(event,{w:(box.x1-box.x0)/u,h:(box.y1-box.y0)/u,strokes:made.strokes,items:made.items});
+});
+// Onto a PDF page: t from appInk.pdf.at, or the page in the middle of the first pane in view.
+function inkPasteOnPdf(clip,t,at){
+  if(!t){for(const c of inkPanes){if(!c.isConnected||!c.inkDoc||c.inkDoc.stale)continue;const r=c.getBoundingClientRect();if(!r.width)continue;t=globalThis.appInk.pdf.at(r.left+r.width/2,r.top+r.height/2);if(t){at=[r.left+r.width/2,r.top+r.height/2];break;}}}
+  if(!t)return false;
+  const vp=t.view.viewport,b=t.view.div.getBoundingClientRect(),per=inkScale(vp)*b.width/vp.width; // screen pixels to a point
+  const strokes=globalThis.appInk.pdf.make(t,{rect:{left:at[0]-clip.w*per/2,top:at[1]-clip.h*per/2,width:per},width:1,box:{x0:0,y0:0,x1:clip.w,y1:clip.h},d:[0,0]},clip.strokes,clip.items);
+  if(!strokes.length)return false;
+  const doc=t.container.inkDoc;inkReplace(doc,t.view,[],strokes);
+  if(strokes.length===1&&strokes[0].tool==='text'){inkTextSelect({container:t.container,view:t.view,id:strokes[0].id});return true;}
+  const boxes=strokes.map(st=>inkBox(st,vp));inkSelectOnly('ink');
+  inkState.selection={doc,container:t.container,page:t.view.id-1,ids:strokes.map(st=>st.id),box:{x0:Math.min(...boxes.map(q=>q.x0))-4,y0:Math.min(...boxes.map(q=>q.y0))-4,x1:Math.max(...boxes.map(q=>q.x1))+4,y1:Math.max(...boxes.map(q=>q.y1))+4}};inkSelectionDraw(t.container);return true;
+}
+document.addEventListener('paste',event=>{
+  if(event.defaultPrevented||state.screen!=='reader'||dialog.open||inkViewOnly()||inkTyping(event.target))return;
+  const clip=globalThis.appInk.clip.read(event);if(!clip)return;event.preventDefault();
+  const at=inkPointerAt,onNb=at&&globalThis.appInk.nb?.at(...at),onPdf=!onNb&&at?globalThis.appInk.pdf.at(...at):null;
+  if(onNb||!onPdf&&state.mode==='notebook'){if(globalThis.appInk.nb?.paste(onNb||null,clip,at))return;}
+  inkPasteOnPdf(clip,onPdf,at);
+});
+// The closed hand of a drag is shown by the one element that holds the pointer (el), or by a sheet over the window
+// when none does. A class on <body> made every text span of every page take its style again: most of a second
+// before the dragged thing first moved, and again when it was let go.
+let inkGrabEl=null,inkGrabSheet=null;
+function inkGrabbing(on,el){
+  inkGrabEl?.classList.remove('ink-grabbing');inkGrabEl=null;inkGrabSheet?.remove();inkGrabSheet=null;if(!on)return;
+  if(el){inkGrabEl=el;el.classList.add('ink-grabbing');}else{inkGrabSheet=document.createElement('div');inkGrabSheet.className='ink-grab-sheet';document.body.append(inkGrabSheet);}
+}
+globalThis.appInk.grabbing=inkGrabbing;
 // ---- Moving ink to where it is let go ----
 // Where ink dragged on a PDF page lands: on the page under the pointer (the nearest drawn page of the pane when it is
 // over none), taken there through the screen, its box kept inside that page (its top-left kept when it is larger), so
@@ -870,7 +973,7 @@ function inkOverlayPaint(s,ctx,k){
 }
 function inside(poly,[x,y]){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(yi>y!==yj>y&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;}
 function inkGestureEnd(){
-  const s=inkStroke;inkStroke=null;if(!s)return;document.body.classList.remove('ink-grabbing');s.live?.end();inkUnhide();globalThis.appInk.nb?.preview(null);
+  const s=inkStroke;inkStroke=null;if(!s)return;inkGrabbing(false);s.live?.end();inkUnhide();globalThis.appInk.nb?.preview(null);
   const vp=s.view.viewport,last=s.path.at(-1),index=s.view.id-1;
   if(s.mode==='shape'){
     if(Math.hypot(last[0]-s.startView[0],last[1]-s.startView[1])<3)return;
@@ -1300,10 +1403,10 @@ function inkTextDrag(at,event){
   // The drag is measured on the page, whose place is read again at every event (the pane may scroll meanwhile).
   const drop=e=>{const r=view.div.getBoundingClientRect();return inkDrop(container,view,box,[(e.clientX-r.left-(event.clientX-rect.left))*sx,(e.clientY-r.top-(event.clientY-rect.top))*sy],[e.clientX,e.clientY]);},placed=()=>inkMapped([hit],view,plan.map,1,plan.view)[0];
   const move=e=>{if(e.pointerId!==event.pointerId)return;if(!moved&&Math.hypot(e.clientX-event.clientX,e.clientY-event.clientY)<=4)return;
-    if(!moved){document.querySelectorAll('.ink-text-selected').forEach(n=>n.remove());inkHide(doc,[hit.id],view);}moved=true;document.body.classList.add('ink-grabbing');
+    if(!moved){document.querySelectorAll('.ink-text-selected').forEach(n=>n.remove());inkHide(doc,[hit.id],view);inkGrabbing(true);}moved=true;
     plan=drop(e);if(plan.nb){live?.end();live=null;globalThis.appInk.nb.preview(plan.nb,inkForNotebook([hit],view,plan));return;}globalThis.appInk.nb?.preview(null);
     if(live?.view!==plan.view){live?.end();const v=plan.view;live=inkLivePreview(v.div,()=>v.viewport,(ctx,k)=>inkPaint(ctx,placed(),v.viewport,k));live.view=v;}live.request();};
-  const up=e=>{if(e.pointerId!==event.pointerId)return;removeEventListener('pointermove',move,true);removeEventListener('pointerup',up,true);removeEventListener('pointercancel',up,true);document.body.classList.remove('ink-grabbing');
+  const up=e=>{if(e.pointerId!==event.pointerId)return;removeEventListener('pointermove',move,true);removeEventListener('pointerup',up,true);removeEventListener('pointercancel',up,true);inkGrabbing(false);
     live?.end();inkUnhide();globalThis.appInk.nb?.preview(null);const letGo=moved&&e.type==='pointerup'&&!doc.stale;if(letGo)plan=drop(e);
     if(letGo&&plan.nb){if(inkSendToNotebook(doc,view,[hit.id],plan))inkTextSelect(null);else inkTextSelectionDraw();return;}
     const next=letGo?placed():null;
@@ -1439,10 +1542,12 @@ function openInkTextMenu(found,x,y,bar){
   closeInkTextMenu();
   // Right-click or a selection: the same row of actions, side by side.
   inkTextMenu=document.createElement('div');inkTextMenu.className='ink-text-menu ink-select-bar';inkTextMenu.setAttribute('role','toolbar');inkTextMenu.setAttribute('aria-label',tr('선택한 문장'));
-  // Beside 밑줄 긋기 and 하이라이트 a dot in the colour they will use (the pen's and the highlighter's); pressed, it
-  // offers the tool row's colours of that kind, and the one chosen is used at once and kept as that tool's colour.
-  const dot=id=>{const kind=INK_MARK_KIND[id];if(!kind)return '';const name=id==='underline'?tr('밑줄 색 고르기'):tr('하이라이트 색 고르기');return `<button type="button" class="ink-text-color" data-ink-text-color="${id}" aria-haspopup="true" aria-expanded="false" aria-label="${name}" title="${name}"><i style="--ink-color:${inkState.color[kind]}"></i></button>`;};
-  inkTextMenu.innerHTML=INK_TEXT_ITEMS.filter(([id])=>id==='copy'||!inkViewOnly()).map(([id,label,symbol,key])=>`<button type="button" data-ink-text="${id}" title="${label} (${key})" aria-keyshortcuts="${key==='Ctrl+C'?'Control+C':key}">${icon(symbol)}<span>${label}</span><kbd>${key}</kbd></button>${dot(id)}`).join('');
+  // 밑줄 긋기 and 하이라이트 show the colour they will use in their own icon (the bar under the U and the A, as the
+  // tool row's pen and highlighter do). The icon is its own button: pressed, it offers the tool row's colours of that
+  // kind, and the one chosen is used at once and kept as that tool's colour. The words beside it do the action.
+  const INK_MARK_ICON={underline:['M7 4v7a5 5 0 0 0 10 0V4','M5 20h14'],highlight:['M7 16l5-12 5 12 M8.5 12h7','M4 21h16']};
+  const colour=id=>{const kind=INK_MARK_KIND[id],[glyph,bar]=INK_MARK_ICON[id],name=id==='underline'?tr('밑줄 색 고르기'):tr('하이라이트 색 고르기');return `<button type="button" class="ink-text-color" data-ink-text-color="${id}" aria-haspopup="true" aria-expanded="false" aria-label="${name}" title="${name}" style="--ink-color:${inkState.color[kind]}"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${glyph}"></path><path class="ink-text-bar-colour" d="${bar}"></path></svg></span></button>`;};
+  inkTextMenu.innerHTML=INK_TEXT_ITEMS.filter(([id])=>id==='copy'||!inkViewOnly()).map(([id,label,symbol,key])=>`${INK_MARK_KIND[id]?colour(id):''}<button type="button" data-ink-text="${id}"${INK_MARK_KIND[id]?' class="ink-text-marked"':''} title="${label} (${key})" aria-keyshortcuts="${key==='Ctrl+C'?'Control+C':key}">${INK_MARK_KIND[id]?'':icon(symbol)}<span>${label}</span><kbd>${key}</kbd></button>`).join('');
   document.body.append(inkTextMenu);
   const w=inkTextMenu.offsetWidth,h=inkTextMenu.offsetHeight;inkTextMenu.style.left=`${Math.max(8,Math.min(x,innerWidth-w-8))}px`;inkTextMenu.style.top=`${Math.max(8,Math.min(y,innerHeight-h-8))}px`;
   Object.assign(inkTextMenu,found,{bar:Boolean(bar)});if(!bar)inkTextMenu.querySelector('button').focus();

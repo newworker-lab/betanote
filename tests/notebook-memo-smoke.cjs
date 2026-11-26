@@ -54,12 +54,12 @@ const root = path.resolve(__dirname, '..');
     await create(p); const empty = await p.locator('.nb-memo-card.open').getAttribute('data-nb-memo-key');
     await p.keyboard.press('Escape'); await p.evaluate(() => document.activeElement?.blur());
     assert.equal(await cards(p).count(), 2);
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => document.querySelectorAll('.nb-page .nb-memo-card').length === 1);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => document.querySelectorAll('.nb-page .nb-memo-card').length === 1);
     assert.equal(await p.evaluate(k => k in notes, empty), false, 'the empty memo went with its card');
     // A memo with text stays when its card is taken off.
     await create(p); const kept = await p.locator('.nb-memo-card.open').getAttribute('data-nb-memo-key'); await p.keyboard.type('남길 메모');
     await p.keyboard.press('Escape'); await p.evaluate(() => document.activeElement?.blur());
-    await p.keyboard.press('Control+z'); await p.waitForFunction(() => document.querySelectorAll('.nb-page .nb-memo-card').length === 1);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForFunction(() => document.querySelectorAll('.nb-page .nb-memo-card').length === 1);
     assert.equal(await p.evaluate(k => notes[k], kept), '남길 메모', 'the memo stays in the 메모 tab');
     await p.evaluate(() => desktopNotes()); await p.waitForTimeout(800);
     // 3. A notebook of no paper: no new memo to make there, and why.

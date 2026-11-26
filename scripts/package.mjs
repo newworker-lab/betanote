@@ -4,7 +4,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import { initializeProxy } from '@electron/get';
 if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) initializeProxy();
 const platform = process.argv[2] || process.platform;
-if (!['linux', 'win32'].includes(platform)) throw new Error('Supported targets: linux, win32');
+if (!['linux', 'win32', 'darwin'].includes(platform)) throw new Error('Supported targets: linux, win32, darwin');
+// macOS is built for Apple silicon (arm64) and Intel (x64) apart: `node scripts/package.mjs darwin arm64`. Its icon
+// (brand/<id>.icns) is made on the Mac that builds it (.github/workflows/mac.yml), from the 1024px PNG.
+const arch = platform === 'darwin' ? (process.argv[3] || process.arch) : 'x64';
+if (!['x64', 'arm64'].includes(arch)) throw new Error('Supported architectures: x64, arm64');
 // The app needs only these at its top level; everything else in the repository
 // (tests, docs, scripts, CI settings, agent notes, README) stays out of the package.
 const APP_ENTRIES = ['core', 'desktop', 'dist', 'node_modules', 'package.json'];
@@ -15,7 +19,9 @@ const outputs = await packager({
   dir: fileURLToPath(new URL('../', import.meta.url)),
   // No letter outside ASCII in a path: the id names the folder and the executable; the window, the menu and Windows'
   // file details show the name.
-  name: appName.id, executableName: appName.id, icon: fileURLToPath(new URL(`../brand/${appName.id}`, import.meta.url)), platform, arch: 'x64', out: 'release', overwrite: true,
+  name: appName.id, executableName: appName.id, icon: fileURLToPath(new URL(`../brand/${appName.id}`, import.meta.url)), platform, arch, out: 'release', overwrite: true,
+  // macOS: the bundle's identifier and category; the name under the Dock and in the menu bar is the product name.
+  ...(platform === 'darwin' ? { appBundleId: `io.github.newworker-lab.${appName.id}`, appCategoryType: 'public.app-category.productivity', extendInfo: { CFBundleDisplayName: appName.product, CFBundleName: appName.product } } : {}),
   win32metadata: { ProductName: appName.name, FileDescription: appName.name },
   ignore: [
     /^\/(release|tests|docs|scripts|brand|msix|\.git|\.github|\.claude|\.superpowers|\.vscode)(\/|$)/,

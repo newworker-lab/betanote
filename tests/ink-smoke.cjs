@@ -131,7 +131,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('[data-ink-redo]').click(); await saved(p); assert.ok(await inked(p, originalPage(2) + ' .app-ink-layer') > 20);
     await p.locator('[data-ink-tool="pen"]').click(); await draw(p, p.locator(originalPage(2)), [.6, .7], [.8, .8]); await saved(p);
     await p.locator('[data-ink-tool="eraser"]').click(); await draw(p, p.locator(originalPage(2)), [.6, .7], [.8, .8]); await saved(p);
-    await p.keyboard.press('Control+z'); await saved(p); await p.keyboard.press('Control+Shift+z'); await saved(p);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); await p.keyboard.press('ControlOrMeta+Shift+z'); await saved(p);
     const attachment = (await fs.readdir(path.join(vault, appName.vaultDir, 'ink')))[0];
     assert.match(await fs.readFile(path.join(vault, appName.vaultDir, 'ink', attachment, 'original.log'), 'utf8'), /"type":"add"/);
     assert.doesNotMatch(await fs.readFile(path.join(vault, appName.vaultDir, 'library.json'), 'utf8'), /"points"/);
@@ -172,7 +172,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
         const [x, y] = await center(written); await p.mouse.move(x - 30, y); await p.mouse.down(); await p.mouse.move(x + 30, y + 4, { steps: 6 }); await p.mouse.up();
         await p.mouse.move(...await center(scrolled)); await p.mouse.wheel(0, 90);
         await aligned(60, `a wheel turn on ${scrolled} right after writing on ${written} leaves the panes apart`);
-        await saved(p); await p.keyboard.press('Control+z'); await saved(p);
+        await saved(p); await p.keyboard.press('ControlOrMeta+z'); await saved(p);
       }
       // A stroke whose lift was lost ends when its pointer is seen moving with nothing pressed, so it does not hold its pane.
       {
@@ -182,7 +182,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
         await saved(p); await p.waitForTimeout(1600);
         await p.mouse.move(...await center('.translated-pane .translated-pages')); await p.mouse.wheel(0, 90);
         await aligned(60, 'a stroke whose lift was lost keeps holding the original');
-        await p.keyboard.press('Control+z'); await saved(p);
+        await p.keyboard.press('ControlOrMeta+z'); await saved(p);
       }
       await cdp.detach(); await p.evaluate(() => { document.querySelector('.original-pages').scrollTop = 0; });
       await p.locator('[data-ink-tool="pen"]').click();

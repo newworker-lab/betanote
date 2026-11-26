@@ -79,7 +79,7 @@ const TEXT = '지난 주 배운 터널링과  로라와 비슷한 부분이 있�
     await enter('  - 가', null, '  - 가\n  - ', 'an indented item keeps its indent'); await p.keyboard.press('Enter'); assert.equal(await doc(), '  - 가\n- ', 'an empty indented item comes out a level');
     await enter('- 가나', 3, '- 가\n- 나', 'Enter in the middle: the rest is the next item');
     await enter('1. 가\n2. 나', 4, '1. 가\n2. \n3. 나', 'the numbers after follow on');
-    await enter('- 가', null, '- 가\n- ', 'again'); await p.keyboard.press('Control+z'); assert.equal(await doc(), '- 가', 'one Ctrl+Z undoes one Enter');
+    await enter('- 가', null, '- 가\n- ', 'again'); await p.keyboard.press('ControlOrMeta+z'); assert.equal(await doc(), '- 가', 'one Ctrl+Z undoes one Enter');
     await enter('보통 글', null, '보통 글\n', 'a plain line is a plain line');
     // With the cursor on a list line its source marker sits right before the text: one space apart, at the line's depth.
     const spacing = word => p.evaluate(w => {

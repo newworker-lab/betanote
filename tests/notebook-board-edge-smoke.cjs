@@ -39,7 +39,7 @@ const root = path.resolve(__dirname, '..');
     const toPoints = async () => { const r = await board.boundingBox(); return { r, s: r.width / 595 }; };
     // Scroll so that page point y is at the middle of the view.
     const showY = y => p.evaluate(y => { const el = document.querySelector('.nb-page[data-board]'), list = el.closest('.nb-pages'), s = el.getBoundingClientRect().width / 595; list.scrollTop += el.getBoundingClientRect().top - list.getBoundingClientRect().top + y * s - list.clientHeight / 2; }, y);
-    const saved = () => p.waitForFunction(() => /저장됨/.test(document.querySelector('.nb-status')?.textContent || ''));
+    const saved = () => p.waitForFunction(() => document.querySelector('.nb-status')?.dataset.state === 'saved');
     // Each check runs on its own: one that fails is said and the next still runs (each begins on a fresh board).
     const failed = []; let r, s;
     const step = async (name, run) => { if (process.env.ONLY && !name.startsWith(process.env.ONLY)) return; try { await p.keyboard.press('Escape'); await p.evaluate(() => { document.querySelectorAll('dialog[open]').forEach(d => d.close()); nbSetZoom(1); }); await run(); console.log('ok', name); } catch (error) { failed.push(name); console.error('FAILED', name, String(error.message).split('\n')[0], (String(error.stack).match(/notebook-board-edge-smoke.cjs:(\d+)/) || [])[1]); } };

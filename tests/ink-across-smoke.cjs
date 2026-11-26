@@ -4,7 +4,8 @@
 // dropped on, inside it); one Ctrl+Z each puts them back, Ctrl+Y moves them again. Beside a notebook the same drag
 // onto a notebook page makes the shape a stroke of that page and the box a text item with its text and size, both
 // inside the page, gone from the PDF; they are shown on the notebook page while dragged; one Ctrl+Z undoes both sides.
-// A drag let go over the same pane stays that pane's (a move within it, as before).
+// A drag let go over the same pane stays that pane's (a move within it, as before). The other way too: a stroke and a
+// text box of the notebook page let go over the PDF become that page's ink, shown there while dragged, one Ctrl+Z.
 // APP_TEST_SOURCE=1 runs the source.
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
@@ -69,17 +70,17 @@ const root = path.resolve(__dirname, '..');
     assert.equal((await ink('O')).length, 0, 'the text box left the original');
     moved = await ink('T'); assert.deepEqual(moved.map(s => s.tool).sort(), ['pen', 'text'], 'and is the translation’s'); assert.equal(moved.find(s => s.tool === 'text').text, 'Note', 'with its text');
     // One undo each; redo.
-    await p.keyboard.press('Escape'); await p.keyboard.press('Control+z'); await p.waitForTimeout(300);
+    await p.keyboard.press('Escape'); await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(300);
     assert.deepEqual([(await ink('O')).map(s => s.tool), (await ink('T')).map(s => s.tool)], [['text'], ['pen']], 'one Ctrl+Z puts the box back');
-    await p.keyboard.press('Control+z'); await p.waitForTimeout(300);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(300);
     assert.deepEqual([(await ink('O')).map(s => s.id).sort(), (await ink('T')).length], [before.map(s => s.id).sort(), 0], 'another puts the rectangle back: the original holds what it held');
-    await p.keyboard.press('Control+y'); await p.waitForTimeout(300);
+    await p.keyboard.press('ControlOrMeta+y'); await p.waitForTimeout(300);
     assert.deepEqual([(await ink('O')).map(s => s.tool), (await ink('T')).map(s => s.tool)], [['text'], ['pen']], 'Ctrl+Y moves it again');
-    await p.keyboard.press('Control+z'); await p.waitForTimeout(300);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(300);
     // Let go over the same pane: a move within it.
     await dragTo(at(o, .2, .36), at(o, .3, .4)); await drop();
     const within = await ink('O'); assert.equal(within.length, 2, 'a drag inside the original stays the original’s'); assert.equal((await ink('T')).length, 0);
-    await p.keyboard.press('Escape'); await p.keyboard.press('Control+z'); await p.waitForTimeout(300);
+    await p.keyboard.press('Escape'); await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(300);
     // What was saved: after the moves and the undos the original's ink file holds both, the translation's none.
     assert.deepEqual(errors, [], 'nothing thrown');
 
@@ -105,14 +106,42 @@ const root = path.resolve(__dirname, '..');
     assert.deepEqual(book.items.map(i => [i.type, i.text]), [['text', 'Note']], 'the box is a text item of the page, with its text'); assert.ok(book.items[0].size >= 6 && book.items[0].x >= 0 && book.items[0].y >= 0 && book.items[0].x + book.items[0].w <= book.width && book.items[0].y + book.items[0].h <= book.height, 'inside the page');
     assert.equal(await p.locator('.nb-page .nb-text textarea').inputValue(), 'Note', 'and shown on it');
     assert.equal((await ink('O')).length, 0, 'the PDF holds neither');
-    await p.keyboard.press('Control+z'); await p.waitForTimeout(400);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(400);
     assert.deepEqual([(await nbState()).items.length, (await ink('O')).map(s => s.tool)], [0, ['text']], 'one Ctrl+Z: the box is back on the PDF and off the notebook');
-    await p.keyboard.press('Control+z'); await p.waitForTimeout(400);
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(400);
     assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.id).sort()], [0, before.map(s => s.id).sort()], 'another: the rectangle too');
-    await p.keyboard.press('Control+y'); await p.waitForTimeout(400);
+    await p.keyboard.press('ControlOrMeta+y'); await p.waitForTimeout(400);
     assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.tool)], [1, ['text']], 'Ctrl+Y moves it onto the notebook again');
     assert.equal(await p.evaluate(() => window.hitTests), 0, 'nor does a drag onto the notebook');
+
+    // The other way: the rectangle now on the notebook page, pressed on its edge with the select tool and let go over the
+    // PDF, is the PDF's again (a stroke of the page it was dropped on, as wide in points), gone from the notebook.
+    const nbEdge = () => p.evaluate(() => { const el = document.querySelector('.nb-page'), r = el.getBoundingClientRect(), pg = nb.doc.pages[0], s = pg.strokes[0], f = r.width / pg.width; return [r.left + s.points[0] * f, r.top + (s.points[1] + s.points[9]) / 2 * f]; });
+    const pdfBefore = await ink('O');
+    await dragTo(await nbEdge(), [o.x + o.width * .5, o.y + o.height * .45]); await p.waitForTimeout(250);
+    assert.ok(await p.evaluate(() => { const c = document.querySelector('.original-pages .page[data-page="1"] .app-ink-live'); if (!c) return false; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }), 'while dragged over the PDF it is drawn on that page');
+    await drop();
+    let back = await ink('O'); assert.equal((await nbState()).strokes.length, 0, 'the rectangle left the notebook page');
+    assert.deepEqual(back.map(s => s.tool + (s.shape || '')).sort(), ['penrect', 'text'], 'and is a stroke of the PDF page'); assert.ok(!pdfBefore.some(s => s.id === back.find(s => s.tool === 'pen').id), 'a new one');
+    { const w = await p.evaluate(() => { const c = [...document.querySelectorAll('.original-pages')].find(c => c.inkDoc && c.offsetParent), s = [...c.inkDoc.strokes.values()].find(s => s.tool === 'pen'), xs = s.points.filter((_, i) => i % 4 === 0); return [Math.max(...xs) - Math.min(...xs), Math.min(...xs), Math.max(...xs)]; }); assert.ok(Math.abs(w[0] - 180) < 4 && w[1] >= 0 && w[2] <= 600, `as wide in points as it was, inside the page (${w})`); }
+    assert.equal(await p.locator('.original-pages .app-ink-live').count(), 0, 'the preview is gone');
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(400);
+    assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.tool)], [1, ['text']], 'one Ctrl+Z: back on the notebook, off the PDF');
+    await p.keyboard.press('ControlOrMeta+y'); await p.waitForTimeout(400);
+    assert.deepEqual([(await nbState()).strokes.length, (await ink('O')).map(s => s.tool).sort()], [0, ['pen', 'text']], 'Ctrl+Y moves it again');
+    // A notebook text box dragged onto the PDF becomes a PDF text box with its text and size.
+    await p.locator('[data-action="nb-text"]').first().click(); await p.waitForTimeout(400); await p.keyboard.insertText('From the notebook'); await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    const itemBefore = (await nbState()).items; assert.equal(itemBefore.length, 1, 'a text box on the notebook');
+    const tb = await p.locator('.nb-page .nb-text').first().boundingBox();
+    await dragTo([tb.x + 14, tb.y + 10], [o.x + o.width * .35, o.y + o.height * .7]); await p.waitForTimeout(250); await drop();
+    assert.equal((await nbState()).items.length, 0, 'the text box left the notebook'); assert.equal(await p.locator('.nb-page .nb-text').count(), 0);
+    back = await p.evaluate(() => { const c = [...document.querySelectorAll('.original-pages')].find(c => c.inkDoc && c.offsetParent); return [...c.inkDoc.strokes.values()].filter(s => s.tool === 'text').map(s => ({ text: s.text, size: s.width, page: s.page, x: s.points[0], y: s.points[1], w: s.w })); });
+    assert.deepEqual(back.map(s => s.text).sort(), ['From the notebook', 'Note'], 'and is a text box of the PDF page'); { const made = back.find(s => s.text === 'From the notebook'); assert.equal(made.size, itemBefore[0].size, 'with its size'); assert.equal(made.w, undefined, 'as wide as its text (no empty room at its right from the notebook box)'); assert.ok(made.x >= 0 && made.x <= 600 && made.y >= 0 && made.y <= 800 && made.page === 0, 'inside the page'); }
+    await p.keyboard.press('ControlOrMeta+z'); await p.waitForTimeout(400);
+    assert.deepEqual([(await nbState()).items.map(i => i.text), (await ink('O')).filter(s => s.tool === 'text').length], [['From the notebook'], 1], 'one Ctrl+Z puts the box back on the notebook');
+    assert.equal(await p.evaluate(() => window.hitTests), 0, 'still no element hit test');
+    assert.equal(await p.evaluate(() => document.body.classList.contains('ink-grabbing')), false, 'the drag marks no class on <body> (every page would take its style again)');
     assert.deepEqual(errors, [], 'nothing thrown');
-    console.log('Ink across smoke passed: a shape and a text box of the original go to the translation and to a notebook page where they are let go, one undo each.');
+    console.log('Ink across smoke passed: a shape and a text box of the original go to the translation and to a notebook page where they are let go, and from the notebook back onto the PDF, one undo each.');
   } finally { await app.close(); await fs.rm(temp, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exit(1); });

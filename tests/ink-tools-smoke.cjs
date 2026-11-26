@@ -101,16 +101,16 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator(`.ink-mark-swatches [data-ink-text-swatch="${other}"]`).click(); await saved(p);
     const made = (await strokes(p)).filter(s => s.tool === 'mark' && !s.style); assert.equal(made.length, marksBefore + 1, 'the selection is highlighted'); assert.equal(await p.evaluate(() => [...document.querySelector('.original-pages').inkDoc.strokes.values()].filter(s => s.tool === 'mark' && !s.style).at(-1).color), other, 'in the colour chosen');
     assert.deepEqual(await markColours(), { ...wasColours, highlighter: other }, 'which is now the highlighter\'s colour; the pen keeps its own'); assert.equal(await p.locator('.ink-text-menu').count(), 0);
-    await p.keyboard.press('Control+z'); await saved(p); await p.evaluate(was => { inkState.color.highlighter = was; persistInkPrefs(); inkToolbarState(); }, wasColours.highlighter);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); await p.evaluate(was => { inkState.color.highlighter = was; persistInkPrefs(); inkToolbarState(); }, wasColours.highlighter);
     await p.mouse.move(textLine.x + 2, textLine.y + textLine.height / 2); await p.mouse.down(); await p.mouse.move(textLine.x + textLine.width - 2, textLine.y + textLine.height / 2, { steps: 6 }); await p.mouse.up(); await p.locator('.ink-select-bar').waitFor();
     const marks = async () => (await strokes(p)).filter(s => s.tool === 'mark').length, markCount = await marks();
     await p.keyboard.press('h'); await saved(p); assert.equal(await marks(), markCount + 1, 'H highlights'); await p.locator('.ink-select-bar').waitFor({ state: 'detached' });
-    await p.keyboard.press('Control+z'); await saved(p); assert.equal(await marks(), markCount);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); assert.equal(await marks(), markCount);
     await pick(); await p.keyboard.press('u'); await saved(p); assert.equal(await marks(), markCount + 1, 'U underlines');
-    await p.keyboard.press('Control+z'); await saved(p);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p);
     // The eraser (whole strokes) takes highlights and underlines too; one undo brings them back.
     await p.locator('[data-ink-tool="eraser"]').click(); await p.mouse.move(textLine.x + 4, textLine.y + textLine.height / 2); await p.mouse.down(); await p.mouse.move(textLine.x + 40, textLine.y + textLine.height / 2, { steps: 5 }); await p.mouse.up(); await saved(p);
-    assert.equal(await marks(), 0, 'erased'); await p.keyboard.press('Control+z'); await saved(p); assert.equal(await marks(), markCount);
+    assert.equal(await marks(), 0, 'erased'); await p.keyboard.press('ControlOrMeta+z'); await saved(p); assert.equal(await marks(), markCount);
     await p.locator('.ink-toolbar [data-ink-tool="read"]').click();
     await pick(); await p.locator('.original-pages .page[data-page="1"] .textLayer span').first().click({ button: 'right' }); await p.locator('[data-ink-text="annotate"]').click();
     await p.locator('#annotation-body').waitFor(); assert.equal(await p.locator('#annotation-page').inputValue(), '1'); assert.match(await p.locator('#annotation-quote').inputValue(), /A research paper connects ideas/);
@@ -127,7 +127,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     const textArea = p.locator('.original-pages .ink-text-editor textarea'); await textArea.waitFor(); assert.ok(await textArea.evaluate(n => n === document.activeElement), 'typing goes straight into the box');
     assert.equal(await p.locator('.ink-text-bar [data-tb="size"]').inputValue(), '24');
     const barBox = await p.locator('.ink-text-bar').boundingBox(), editorBox = await p.locator('.ink-text-editor').boundingBox(); assert.ok(barBox.y + barBox.height <= editorBox.y, 'the bar is above the box');
-    await p.keyboard.type('확인할 부분'); await p.keyboard.press('Control+b');
+    await p.keyboard.type('확인할 부분'); await p.keyboard.press('ControlOrMeta+b');
     await p.locator('.ink-text-bar [data-tb="color"]').click(); await p.locator('.ink-text-pop').filter({ hasText: '텍스트 색상' }).waitFor(); assert.equal(await p.locator('.ink-text-pop .ink-text-row').first().locator('[data-tb-color]').count(), 5);
     assert.deepEqual(await p.locator('.ink-text-pop .ink-text-row').nth(1).locator('[data-tb-color]').evaluateAll(l => l.map(b => b.dataset.tbColor)), ['#1f2937', '#1d4ed8', '#dc2626', '#047857', '#7c3aed'], 'the second row: the pen colours and a violet, five like the others');
     // The colour panel sits above the bar with its tail at the colour button; the chosen colour is marked.
@@ -156,7 +156,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     assert.equal(await p.locator('[data-ink-tool="shape"]').getAttribute('aria-label'), '타원');
     await drag([.6, .5], [.8, .6]); await saved(p);
     assert.ok((await strokes(p)).some(s => s.shape === 'ellipse'));
-    await p.keyboard.press('Control+z'); await saved(p);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p);
     // The rectangle runs corner to corner: its top-right corner is inked (the pen's smoothing used to round it into a "D").
     const corner = await p.evaluate(() => { const c = document.querySelector('.original-pages .page[data-page="1"] .app-ink-layer'), v = document.querySelector('.original-pages').pdfViewer.getPageView(0).viewport, s = [...document.querySelector('.original-pages').inkDoc.strokes.values()].find(s => s.shape === 'rect'), k = c.width / v.width, xs = [], ys = [];
       for (let i = 0; i < s.points.length; i += 4) { const [x, y] = v.convertToViewportPoint(s.points[i], s.points[i + 1]); xs.push(x); ys.push(y); }
@@ -168,7 +168,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('[data-ink-pick="shape"][data-value="triangle"]').click(); await drag([.6, .5], [.8, .6]); await saved(p);
     await p.locator('[data-ink-tool="shape"]').click(); await p.locator('[data-ink-pick="shape"][data-value="arrow"]').click(); await drag([.6, .62], [.8, .55]); await saved(p);
     assert.deepEqual((await strokes(p)).filter(s => ['triangle', 'arrow'].includes(s.shape)).map(s => [s.shape, s.n]), [['triangle', 16], ['arrow', 20]]);
-    await p.keyboard.press('Control+z'); await saved(p); await p.keyboard.press('Control+z'); await saved(p);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); await p.keyboard.press('ControlOrMeta+z'); await saved(p);
     // Held-still recognition: a triangle (also begun mid-side), a rectangle; a highlighter line straightens and levels, a wavy one does not.
     const recognised = await p.evaluate(() => { const ink = globalThis.appInk, pts = list => { const out = []; for (let i = 0; i < list.length - 1; i++) for (let j = 0; j < 12; j++) { const t = j / 12; out.push(list[i][0] + (list[i + 1][0] - list[i][0]) * t, list[i][1] + (list[i + 1][1] - list[i][1]) * t, .5, 0); } out.push(...list.at(-1), .5, 0); return out; };
       return { triangle: ink.recognizeShape(pts([[50, 10], [90, 80], [10, 80], [50, 12]]))?.shape, midSide: ink.recognizeShape(pts([[30, 80], [10, 80], [50, 10], [90, 80], [32, 80]]))?.shape, rect: ink.recognizeShape(pts([[10, 10], [90, 10], [90, 70], [10, 70], [10, 12]]))?.shape, straight: JSON.stringify(ink.straighten(pts([[10, 50], [60, 52], [110, 51]]))), wavy: ink.straighten(pts([[10, 50], [40, 80], [70, 20], [110, 50]])) }; });
@@ -193,13 +193,13 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await drag([.3, .55], [.3, .68]); await saved(p);
     const moved = (await strokes(p)).find(s => s.shape === 'rect');
     assert.equal(moved.from, before.id); assert.notEqual(moved.id, before.id);
-    await p.keyboard.press('Control+z'); await saved(p);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p);
     assert.equal((await strokes(p)).find(s => s.shape === 'rect').id, before.id, 'undo restores the original as one step');
     // The bar above a selection duplicates it; one undo takes the copy away.
     await p.mouse.move(...at(.15, .45)); await p.mouse.down(); for (const pt of [[.45, .45], [.45, .65], [.15, .65], [.15, .46]]) await p.mouse.move(...at(...pt), { steps: 4 }); await p.mouse.up();
     await p.locator('.ink-selection-actions [data-ink-selection="duplicate"]').click(); await saved(p);
     assert.equal((await strokes(p)).filter(s => s.shape === 'rect').length, 2);
-    await p.keyboard.press('Control+z'); await saved(p); assert.equal((await strokes(p)).filter(s => s.shape === 'rect').length, 1);
+    await p.keyboard.press('ControlOrMeta+z'); await saved(p); assert.equal((await strokes(p)).filter(s => s.shape === 'rect').length, 1);
     // The hand sits under the reading button (pressed again, it offers the
     // hand); it moves the lasso selection from anywhere on the page.
     assert.equal(await p.locator('[data-ink-group="lasso"],[data-ink-pick="lasso"]').count(), 0, 'the lasso is a tool of its own');
@@ -281,7 +281,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.keyboard.press('Enter'); await p.keyboard.press('Enter'); await p.keyboard.type('끝');
     assert.equal(await again.inputValue(), '1. 고친 메모\n2. 둘째\n  1. 안쪽\n끝');
     assert.equal(await p.locator('.ink-text-bar [data-tb="list"]').getAttribute('aria-pressed'), 'false', 'out of the list');
-    await p.keyboard.press('Control+z'); assert.equal(await again.inputValue(), '1. 고친 메모\n2. 둘째\n  1. 안쪽\n', 'undo still works');
+    await p.keyboard.press('ControlOrMeta+z'); assert.equal(await again.inputValue(), '1. 고친 메모\n2. 둘째\n  1. 안쪽\n', 'undo still works');
     await p.keyboard.type('끝');
     if (process.env.APP_INK_SCREENSHOT) await p.screenshot({ path: process.env.APP_INK_SCREENSHOT + '-list.png' });
     await p.keyboard.press('Escape'); await saved(p); assert.equal(await p.evaluate(() => globalThis.appInk.tool), 'read', 'Esc finishes the box');

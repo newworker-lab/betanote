@@ -44,7 +44,7 @@ async function samplePdf(file, text) { const doc = await PDFDocument.create(), f
     // Esc clears it; Ctrl+A selects the whole list.
     await rows.nth(1).focus(); await p.keyboard.press('Escape'); assert.deepEqual(await selection(), []);
     assert.equal(await p.locator('.batch-bar:not([hidden])').count(), 0);
-    await rows.nth(0).focus(); await p.keyboard.press('Control+a'); assert.equal((await selection()).length, 4);
+    await rows.nth(0).focus(); await p.keyboard.press('ControlOrMeta+a'); assert.equal((await selection()).length, 4);
 
     // 폴더로 이동… moves every selected paper's PDF; undo puts them back.
     await rows.nth(3).click({ modifiers: ['Control'] }); await rows.nth(2).click({ modifiers: ['Control'] });

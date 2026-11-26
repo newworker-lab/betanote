@@ -1,0 +1,103 @@
+name: Build macOS app
+
+# Builds the macOS apps (Apple silicon and Intel), runs the app's own checks on the Mac, and keeps the zipped apps
+# as this run's artifacts. Not attached to a release yet: the macOS build is being tried out. The apps are signed
+# ad hoc only (no Apple Developer ID, not notarised), so macOS asks before the first start.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/mac.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install build tools
+        run: npm ci --ignore-scripts
+      # macOS keeps temporary files under /var, a link to /private/var. The tests hand their temporary folders to the
+      # stores as they are, and the stores refuse a folder reached through a link (the app itself resolves the vault's
+      # path first), so the tests are given the resolved place.
+      - name: Use the temporary folder's real path
+        run: echo "TMPDIR=$(cd "${TMPDIR:-/tmp}" && pwd -P)" >> "$GITHUB_ENV"
+      # While the macOS build is tried out, a failing check does not stop the run: one run tells all of them
+      # (each macOS minute counts ten in a private repository).
+      - name: Unit tests
+        continue-on-error: true
+        run: |
+          npm test > "$RUNNER_TEMP/unit.log" 2>&1 || true
+          grep -nE "^(not ok|✖)" "$RUNNER_TEMP/unit.log" | head -60 || true
+          tail -12 "$RUNNER_TEMP/unit.log"
+      # One check (pdf-layout-smoke) starts the source with Electron itself, which `npm ci --ignore-scripts` did not fetch.
+      # It is run here, before anything is packaged: run alone like this it passes on a Mac (in under a minute), while
+      # after the packaged apps' checks it stopped without a word (why is not known).
+      - name: The check that runs the source
+        continue-on-error: true
+        run: |
+          node node_modules/electron/install.js
+          npm run build
+          start=$SECONDS
+          if perl -e 'alarm shift; exec @ARGV' 300 node tests/pdf-layout-smoke.cjs > "$RUNNER_TEMP/pdf-layout-smoke.log" 2>&1; then echo "PASS pdf-layout-smoke ($((SECONDS-start))s)"; else echo "FAIL pdf-layout-smoke ($((SECONDS-start))s)"; tail -30 "$RUNNER_TEMP/pdf-layout-smoke.log"; fi
+      - name: Make the app icon
+        run: |
+          set -euo pipefail
+          id=$(node -p "require('./core/app-name.json').id")
+          set="$RUNNER_TEMP/icon.iconset"; mkdir "$set"
+          for s in 16 32 128 256 512; do
+            sips -z $s $s brand/png/$id-icon-1024.png --out "$set/icon_${s}x${s}.png" >/dev/null
+            sips -z $((s*2)) $((s*2)) brand/png/$id-icon-1024.png --out "$set/icon_${s}x${s}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$set" -o brand/$id.icns
+      - name: Build the apps
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/package.mjs darwin arm64
+          node scripts/package.mjs darwin x64
+      - name: Sign ad hoc
+        run: |
+          set -euo pipefail
+          id=$(node -p "require('./core/app-name.json').id")
+          for a in arm64 x64; do codesign --force --deep --sign - "release/$id-darwin-$a/$id.app"; codesign --verify --deep --strict "release/$id-darwin-$a/$id.app"; done
+      - name: Zip the apps
+        run: |
+          set -euo pipefail
+          id=$(node -p "require('./core/app-name.json').id"); v=$(node -p "require('./package.json').version")
+          mkdir out
+          for a in arm64 x64; do ditto -c -k --sequesterRsrc --keepParent "release/$id-darwin-$a/$id.app" "out/$id-$v-macos-$a.zip"; done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/*.zip
+          if-no-files-found: error
+      # What the app looks like on this Mac: the main screens as PNGs, kept as the run's artifact (tests/tour-shots.cjs).
+      - name: Take screenshots of the app
+        continue-on-error: true
+        run: |
+          perl -e 'alarm shift; exec @ARGV' 300 node tests/tour-shots.cjs "$RUNNER_TEMP/screens"
+          ls -la "$RUNNER_TEMP/screens"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: ${{ runner.temp }}/screens/*.png
+          if-no-files-found: warn
+      # Each check is given a time limit (a check that waits for something that never comes would hold the run).
+      - name: Test the packaged app
+        continue-on-error: true
+        run: |
+          limit() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+          for t in desktop-smoke ink-smoke ink-tools-smoke notebook-smoke highlight-smoke ink-across-smoke ink-clipboard-smoke; do
+            start=$SECONDS
+            if limit 300 node tests/$t.cjs > "$RUNNER_TEMP/$t.log" 2>&1; then echo "PASS $t ($((SECONDS-start))s)"; else echo "FAIL $t ($((SECONDS-start))s)"; tail -30 "$RUNNER_TEMP/$t.log"; fi
+          done

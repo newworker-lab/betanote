@@ -71,19 +71,19 @@ const styleOf = ([scope, word]) => {
     await run(p, memoView, 'view.dispatch({ selection: { anchor: view.state.doc.line(3).from + 5 } });'); await photo(p.locator('.memo-card.open'), 'memo-emphasis-cursor.png');
 
     // Ctrl+B and Ctrl+I on a selected word: styled at once, bold italic together; the cursor gone, the markers hide.
-    await put(p, memoView, 'abc 단어 끝', 4, 6); await p.keyboard.press('Control+b');
+    await put(p, memoView, 'abc 단어 끝', 4, 6); await p.keyboard.press('ControlOrMeta+b');
     assert.equal(await run(p, memoView, 'return view.state.doc.toString();'), 'abc **단어** 끝');
     assert.deepEqual(await p.evaluate(styleOf, ['.memo-card.open .field-live', '단어']), ['bold'], 'Ctrl+B: bold at once');
-    await p.keyboard.press('Control+i'); assert.equal(await run(p, memoView, 'return view.state.doc.toString();'), 'abc ***단어*** 끝');
+    await p.keyboard.press('ControlOrMeta+i'); assert.equal(await run(p, memoView, 'return view.state.doc.toString();'), 'abc ***단어*** 끝');
     assert.deepEqual(await p.evaluate(styleOf, ['.memo-card.open .field-live', '단어']), ['bold', 'italic'], 'Ctrl+I after Ctrl+B: bold italic at once');
     await run(p, memoView, 'view.dispatch({ selection: { anchor: view.state.doc.length } });');
     assert.deepEqual(await lineTexts(p, '.memo-card.open .field-live'), ['abc 단어 끝'], 'the cursor at the end of the line: no stars');
     // A word picked with a space beside it and made bold: the space stays outside the stars; pressed again, it comes off.
     const A = '.memo-card.open .field-live', doc = () => run(p, memoView, 'return view.state.doc.toString();');
-    await put(p, memoView, 'abc test def', 3, 8); await p.keyboard.press('Control+b'); assert.equal(await doc(), 'abc **test** def', 'Ctrl+B on " test": the space stays outside');
+    await put(p, memoView, 'abc test def', 3, 8); await p.keyboard.press('ControlOrMeta+b'); assert.equal(await doc(), 'abc **test** def', 'Ctrl+B on " test": the space stays outside');
     assert.deepEqual(await p.evaluate(styleOf, [A, 'test']), ['bold'], 'and it is bold');
-    await p.keyboard.press('Control+b'); assert.equal(await doc(), 'abc test def', 'Ctrl+B again takes it off');
-    await put(p, memoView, 'abc test def', 4, 9); await p.keyboard.press('Control+i'); assert.equal(await doc(), 'abc *test* def', 'Ctrl+I on "test ": the space stays outside');
+    await p.keyboard.press('ControlOrMeta+b'); assert.equal(await doc(), 'abc test def', 'Ctrl+B again takes it off');
+    await put(p, memoView, 'abc test def', 4, 9); await p.keyboard.press('ControlOrMeta+i'); assert.equal(await doc(), 'abc *test* def', 'Ctrl+I on "test ": the space stays outside');
     // The lines of the report as they were saved: ** test** shows bold too (a space just inside ** is still bold).
     await put(p, memoView, '커서\n==test==\n** test**\n*test*', 0);
     assert.deepEqual(await lineTexts(p, A), ['커서', 'test', 'test', 'test'], 'no markers left showing');

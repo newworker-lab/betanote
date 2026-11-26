@@ -82,8 +82,10 @@ body.ink-active .app-ink-layer{touch-action:none}
 .ink-group>.ink-icon::after{content:"";position:absolute;right:3px;bottom:3px;border:2.5px solid transparent;border-right-color:currentColor;border-bottom-color:currentColor;opacity:.55}
 .ink-flyout{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:7px;box-shadow:0 4px 12px rgba(0,0,0,.14)}
 .ink-flyout .ink-icon.active{background:var(--pale,#e8f3ff);color:var(--accent,#1b64da)}
-body.ink-active:not(.ink-grabbing) :is(.app-ink-layer,.nb-page).ink-over-selection{cursor:grab}
-body.ink-grabbing :is(.app-ink-layer,.nb-page){cursor:grabbing}
+body.ink-active :is(.app-ink-layer,.nb-page).ink-over-selection{cursor:grab}
+/* A drag's closed hand: on the element holding the pointer, or a sheet over the window (desktop/ink.js inkGrabbing). */
+.ink-grabbing,.nb-page.ink-grabbing *{cursor:grabbing!important}
+.ink-grab-sheet{position:fixed;inset:0;z-index:2147483000;cursor:grabbing}
 /* Annotations gathered in page order (주석 모아 보기). */
 .annotation-collection{padding-left:20px;max-height:60vh;overflow:auto}
 .annotation-collection li{margin:6px 0;line-height:1.5}
@@ -159,5 +161,4 @@ body.ink-over-text .translated-pages .page{cursor:text}
 body.ink-text-hover .translated-pages .page,body.ink-text-hover .translated-pages .page *{cursor:move!important}
 /* With the select tool, over a pen stroke or shape it can move (desktop/ink.js inkGrabHit). */
 body:not(.ink-active).ink-stroke-hover .translated-pages .page,body:not(.ink-active).ink-stroke-hover .translated-pages .page *{cursor:grab!important}
-body.ink-grabbing .translated-pages .page,body.ink-grabbing .translated-pages .page *{cursor:grabbing!important}
-body:not(.ink-active):not(.ink-grabbing) .nb-page.ink-over-stroke{cursor:grab}
+body:not(.ink-active) .nb-page.ink-over-stroke{cursor:grab}

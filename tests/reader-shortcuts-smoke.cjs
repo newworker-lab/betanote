@@ -50,28 +50,28 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     const tool = () => p.evaluate(() => globalThis.appInk.tool), color = () => p.evaluate(() => globalThis.appInk.color);
     const bar = p.locator('.ink-toolbar');
     assert.deepEqual(await bar.locator('.ink-tools [data-ink-tool]').evaluateAll(list => list.map(b => b.dataset.tip.split(' · ').at(-1))), ['Ctrl+1', 'Ctrl+2', 'Ctrl+3', 'Ctrl+4', 'Ctrl+5', 'Ctrl+6', 'Ctrl+7']);
-    for (const [key, expected] of [['2', 'pen'], ['3', 'highlighter'], ['4', 'eraser'], ['6', 'lasso'], ['7', 'text'], ['1', 'read']]) { await p.keyboard.press('Control+' + key); assert.equal(await tool(), expected, 'Ctrl+' + key); }
+    for (const [key, expected] of [['2', 'pen'], ['3', 'highlighter'], ['4', 'eraser'], ['6', 'lasso'], ['7', 'text'], ['1', 'read']]) { await p.keyboard.press('ControlOrMeta+' + key); assert.equal(await tool(), expected, 'Ctrl+' + key); }
     assert.equal(await bar.locator('[data-ink-tool="text"]').getAttribute('aria-label'), '텍스트 상자');
-    await p.keyboard.press('Control+5'); assert.equal(await tool(), 'shape');
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await tool(), 'shape');
     assert.equal(await p.locator('.ink-flyout').count(), 0, 'a shortcut does not open a tool menu');
     // Pressed again, a group's key moves to its next way (사각형 → 타원 → 삼각형 …, 지우개 → 부분 지우개, 읽기 → 손 → 레이저).
     const shape = () => p.evaluate(() => globalThis.appInk.shape), eraser = () => p.evaluate(() => globalThis.appInk.eraser);
     assert.equal(await shape(), 'rect');
-    await p.keyboard.press('Control+5'); assert.equal(await shape(), 'ellipse'); assert.equal(await tool(), 'shape'); await p.locator('#toast').filter({ hasText: '타원' }).waitFor();
-    await p.keyboard.press('Control+5'); assert.equal(await shape(), 'triangle');
-    await p.keyboard.press('Control+4'); assert.equal(await eraser(), 'stroke', 'the first press only picks the tool');
-    await p.keyboard.press('Control+4'); assert.equal(await eraser(), 'partial'); await p.keyboard.press('Control+4'); assert.equal(await eraser(), 'stroke');
-    await p.keyboard.press('Control+1'); assert.equal(await tool(), 'read');
-    for (const expected of ['hand', 'laser', 'read']) { await p.keyboard.press('Control+1'); assert.equal(await tool(), expected); }
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'ellipse'); assert.equal(await tool(), 'shape'); await p.locator('#toast').filter({ hasText: '타원' }).waitFor();
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'triangle');
+    await p.keyboard.press('ControlOrMeta+4'); assert.equal(await eraser(), 'stroke', 'the first press only picks the tool');
+    await p.keyboard.press('ControlOrMeta+4'); assert.equal(await eraser(), 'partial'); await p.keyboard.press('ControlOrMeta+4'); assert.equal(await eraser(), 'stroke');
+    await p.keyboard.press('ControlOrMeta+1'); assert.equal(await tool(), 'read');
+    for (const expected of ['hand', 'laser', 'read']) { await p.keyboard.press('ControlOrMeta+1'); assert.equal(await tool(), expected); }
     assert.equal(await p.locator('.ink-flyout').count(), 0, 'cycling does not open a menu');
     // Shift+1…: the colours shown for the current tool (pen, then highlighter).
-    await p.keyboard.press('Control+2'); await p.keyboard.press('Shift+Digit3'); assert.equal((await color()).pen, '#dc2626');
+    await p.keyboard.press('ControlOrMeta+2'); await p.keyboard.press('Shift+Digit3'); assert.equal((await color()).pen, '#dc2626');
     assert.deepEqual(await bar.locator('.ink-colors [data-ink-color]').evaluateAll(list => list.map(b => b.dataset.tip.split(' · ').at(-1))), ['Shift+1', 'Shift+2', 'Shift+3', 'Shift+4']);
-    await p.keyboard.press('Control+3'); await p.keyboard.press('Shift+Digit2'); assert.equal((await color()).highlighter, '#00f600'); assert.equal(await tool(), 'highlighter');
+    await p.keyboard.press('ControlOrMeta+3'); await p.keyboard.press('Shift+Digit2'); assert.equal((await color()).highlighter, '#00f600'); assert.equal(await tool(), 'highlighter');
     // Typing in a field is not a shortcut.
-    await p.locator('[data-tab="메모"]').click(); await openNote(p); await p.locator('.memo-card.open .field-live .cm-content').click(); await p.keyboard.press('Control+2'); assert.equal(await tool(), 'highlighter');
+    await p.locator('[data-tab="메모"]').click(); await openNote(p); await p.locator('.memo-card.open .field-live .cm-content').click(); await p.keyboard.press('ControlOrMeta+2'); assert.equal(await tool(), 'highlighter');
     await p.keyboard.press('Shift+Digit1'); assert.equal((await color()).highlighter, '#00f600'); assert.equal(await (await openNote(p)).inputValue(), '!');
-    await (await openNote(p)).fill(''); await p.evaluate(() => document.activeElement.blur()); await p.keyboard.press('Control+1'); assert.equal(await tool(), 'read');
+    await (await openNote(p)).fill(''); await p.evaluate(() => document.activeElement.blur()); await p.keyboard.press('ControlOrMeta+1'); assert.equal(await tool(), 'read');
 
     // Ctrl+wheel zooms the pages (Cmd on a Mac, or a trackpad pinch); Shift or Ctrl+Shift + wheel scrolls sideways.
     const pages = p.locator('.original-pages'), width = () => p.locator('.original-pages .page[data-page="1"]').evaluate(n => n.getBoundingClientRect().width);
@@ -94,19 +94,19 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.evaluate(() => { document.querySelector('.original-pages').scrollTop = 0; });
     const sheet = await p.locator('.original-pages .page[data-page="1"]').boundingBox(), top = Math.max(sheet.y, 150) + 60, x0 = sheet.x + 60;
     const draw = async (y, dx, dy, shift) => { if (shift) await p.keyboard.down('Shift'); await p.mouse.move(x0, y); await p.mouse.down(); await p.mouse.move(x0 + dx * .4, y + dy * .9 + 15, { steps: 6 }); await p.mouse.move(x0 + dx, y + dy, { steps: 6 }); await p.mouse.up(); if (shift) await p.keyboard.up('Shift'); };
-    await p.keyboard.press('Control+2'); await draw(top, 180, 30, false); assert.ok((await last()).n > 2, 'without Shift the pen stays freehand');
+    await p.keyboard.press('ControlOrMeta+2'); await draw(top, 180, 30, false); assert.ok((await last()).n > 2, 'without Shift the pen stays freehand');
     await draw(top + 50, 180, 30, true); let st = await last(); assert.equal(st.tool, 'pen'); assert.equal(st.n, 2, 'a ruler line: start and end only');
-    await p.keyboard.press('Control+3'); await draw(top + 100, 180, -20, true); st = await last(); assert.equal(st.tool, 'highlighter'); assert.equal(st.n, 2);
+    await p.keyboard.press('ControlOrMeta+3'); await draw(top + 100, 180, -20, true); st = await last(); assert.equal(st.tool, 'highlighter'); assert.equal(st.n, 2);
     const near = (a, b, what) => assert.ok(Math.abs(a - b) <= Math.max(a, b) * .02 + .5, `${what}: ${a} vs ${b}`);
-    await p.keyboard.press('Control+5'); assert.equal(await shape(), 'triangle'); await draw(top + 150, 160, 40, true); st = await last();
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'triangle'); await draw(top + 150, 160, 40, true); st = await last();
     const corner = i => [st.xs[i], st.ys[i]], side = (i, j) => Math.hypot(corner(i)[0] - corner(j)[0], corner(i)[1] - corner(j)[1]);
     assert.equal(st.shape, 'triangle'); near(side(0, 1), side(1, 2), 'equilateral'); near(side(1, 2), side(2, 0), 'equilateral');
-    await p.keyboard.press('Control+5'); assert.equal(await shape(), 'line'); await draw(top + 230, 160, 25, true); st = await last(); near(st.ys[0], st.ys[1], 'a nearly flat line is level');
-    await p.keyboard.press('Control+5'); await p.keyboard.press('Control+5'); assert.equal(await shape(), 'rect');
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'line'); await draw(top + 230, 160, 25, true); st = await last(); near(st.ys[0], st.ys[1], 'a nearly flat line is level');
+    await p.keyboard.press('ControlOrMeta+5'); await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'rect');
     await draw(top + 260, 160, 40, false); st = await last(); assert.ok(st.w > st.h * 2, 'without Shift the rectangle follows the drag');
     await draw(top + 260, 160, 40, true); st = await last(); assert.equal(st.shape, 'rect'); near(st.w, st.h, 'square');
-    await p.keyboard.press('Control+5'); assert.equal(await shape(), 'ellipse'); await draw(top + 260, 60, 150, true); st = await last(); near(st.w, st.h, 'circle');
-    await p.keyboard.press('Control+1');
+    await p.keyboard.press('ControlOrMeta+5'); assert.equal(await shape(), 'ellipse'); await draw(top + 260, 60, 150, true); st = await last(); near(st.w, st.h, 'circle');
+    await p.keyboard.press('ControlOrMeta+1');
 
     // Read status at the right end of the PDF tool row: one button that shows the status (a click opens a menu),
     // after 그림 설명·주석 추가. A shorter row shows those two as icons; when the tools wrap, the group takes the line above them.
