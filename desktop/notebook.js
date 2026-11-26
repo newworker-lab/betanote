@@ -91,18 +91,19 @@ function nbItemHtml(item,page={width:NB_W,height:NB_H}){
 async function nbLoadAssets(root){for(const img of root.querySelectorAll('img[data-asset]')){const hash=img.dataset.asset;if(!nb.assets.has(hash))nb.assets.set(hash,window.appApi.notebookAssetGet(state.storageKey,hash).catch(()=>''));img.src=await nb.assets.get(hash);}}
 const nbPage=id=>nb.doc.pages.find(p=>p.id===id);
 // Every change records the previous pages, so undo restores exactly.
-function nbChange(label,mutate){
+function nbChange(label,mutate,extra){
   const before=JSON.stringify(nb.doc.pages);mutate();const grown=nb.doc.pages.filter(nbGrow),after=JSON.stringify(nb.doc.pages),id=nb.doc.id;
-  if(before===after)return;
+  if(before===after)return false;
   // A change past what a page holds (as many strokes or items as a notebook file takes) is not kept: it would make
   // every later save fail. It is said instead, and the page is as it was.
   const over=nb.doc.pages.find(p=>p.strokes.length>NB_MAX_STROKES||p.items.length>NB_MAX_ITEMS);
-  if(over){const full=over.strokes.length>NB_MAX_STROKES;nb.doc.pages=JSON.parse(before);nbRender();toast(full?tr('한 쪽에는 필기를 {n}개까지 둘 수 있습니다. 다른 쪽에 이어 쓰세요.',{n:NB_MAX_STROKES.toLocaleString()}):tr('한 쪽에는 항목을 {n}개까지 둘 수 있습니다. 다른 쪽에 이어 넣으세요.',{n:NB_MAX_ITEMS.toLocaleString()}),6000);return;}
+  if(over){const full=over.strokes.length>NB_MAX_STROKES;nb.doc.pages=JSON.parse(before);nbRender();toast(full?tr('한 쪽에는 필기를 {n}개까지 둘 수 있습니다. 다른 쪽에 이어 쓰세요.',{n:NB_MAX_STROKES.toLocaleString()}):tr('한 쪽에는 항목을 {n}개까지 둘 수 있습니다. 다른 쪽에 이어 넣으세요.',{n:NB_MAX_ITEMS.toLocaleString()}),6000);return false;}
   // A whiteboard that grew takes its new height where it is (its items, pins and band follow); nothing on it is drawn
   // again, so a stroke started or a box being edited since goes on. The growth is part of the change (one undo).
   for(const page of grown)nbBoardResized(page);
-  globalThis.appInk.record({custom:true,label,undo:()=>{if(nb.doc?.id!==id)return;nb.sel=null;nb.doc.pages=JSON.parse(before);nbSave();nbRender();},redo:()=>{if(nb.doc?.id!==id)return;nb.sel=null;nb.doc.pages=JSON.parse(after);nbSave();nbRender();}});
-  nbSave();
+  // extra: what the same step did elsewhere (ink that left a PDF for this page), undone and done again with it.
+  globalThis.appInk.record({custom:true,label,undo:()=>{if(nb.doc?.id!==id)return;extra?.undo();nb.sel=null;nb.doc.pages=JSON.parse(before);nbSave();nbRender();},redo:()=>{if(nb.doc?.id!==id)return;extra?.redo();nb.sel=null;nb.doc.pages=JSON.parse(after);nbSave();nbRender();}});
+  nbSave();return true;
 }
 // What a page holds (desktop/notebook.cjs validNotebook): past it a save would be refused.
 const NB_MAX_STROKES=20000,NB_MAX_ITEMS=2000;
@@ -205,6 +206,28 @@ document.addEventListener('pointerdown',event=>{if(nbFocus&&!event.target.closes
 function nbFocusBox(id){nbFocus=id;if(nb.sel)nbSelect(null);globalThis.appInk.clearSelection();nbMarkFocus();}
 // A selection or text box chosen on a PDF page lets go of the notebook's (desktop/ink.js inkSelectOnly).
 globalThis.appInk.onSelect=()=>{if(nb.sel)nbSelect(null);if(nbFocus){nbFocus=null;nbMarkFocus();}};
+// Ink dragged off a PDF page beside the notebook (desktop/ink.js inkDrop): the notebook page under the pointer, the ink
+// shown there while it is dragged, and the ink taken onto the page when it is let go (with the PDF's side as one undo).
+let nbGhost=null;
+globalThis.appInk.nb={
+  at(cx,cy){
+    if(state.screen!=='reader'||state.mode!=='notebook'||!nb.doc)return null;
+    const el=document.elementsFromPoint(cx,cy).map(n=>n.closest?.('.nb-page')).find(Boolean),page=el&&nbPage(el.dataset.pageId);
+    return page?{el,pageId:page.id,width:page.width,height:page.height,rect:el.getBoundingClientRect()}:null;
+  },
+  preview(t,made){
+    if(nbGhost&&nbGhost!==t?.el){if(nbGhost.isConnected){nbGhost.querySelectorAll(':scope>.nb-ghost').forEach(n=>n.remove());nbDrawPage(nbGhost);}nbGhost=null;}
+    const page=t&&nb.doc&&nbPage(t.pageId);if(!page||!t.el.isConnected)return;
+    nbGhost=t.el;nbPaint(t.el,[...page.strokes,...made.strokes]);t.el.querySelectorAll(':scope>.nb-ghost').forEach(n=>n.remove());
+    t.el.insertAdjacentHTML('beforeend',made.items.map(item=>`<div class="nb-ghost" style="left:${pct(item.x,page.width)};top:${pct(item.y,page.height)};width:${pct(item.w,page.width)};height:${pct(item.h,page.height)}"></div>`).join(''));
+  },
+  take(t,strokes,items,extra){
+    const page=nb.doc&&nbPage(t.pageId);if(!page||!strokes.length&&!items.length)return false;
+    const kept=nbChange('옮기기',()=>{page.strokes.push(...strokes);page.items.push(...items);},extra)===true; // i18n:keep
+    if(kept&&t.el.isConnected)nbRefreshPage(t.el);
+    return kept;
+  },
+};
 function nbPoint(el,event){const r=el.getBoundingClientRect(),{w,h}=nbSize(el);return [(event.clientX-r.left)/r.width*w,(event.clientY-r.top)/r.height*h];}
 function nbBindPage(el){
   el.addEventListener('pointerdown',event=>{

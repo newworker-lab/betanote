@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.4" src="https://img.shields.io/badge/version-1.1.4-1b64da">
+  <img alt="버전 1.1.5" src="https://img.shields.io/badge/version-1.1.5-1b64da">
   <img alt="Windows · Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">
@@ -64,11 +64,11 @@
 
 ![문단을 고르고 주석에서 AI에게 물어 답변을 크게 보는 화면](docs/images/scene-ask.gif)
 
-그림도 같습니다. 도구 줄의 `그림 설명`을 누르고 그림을 끌어 고르면, AI가 그 그림이 무엇을 보여 주는지 본문과 함께 풀어 줍니다.
+그림도 같습니다. 도구 줄의 `그림 설명`을 누르고 그림을 끌어 고른 뒤 보내면, AI가 그 그림이 무엇을 보여 주는지 본문과 함께 풀어 줍니다. 질문을 적어 보낼 수도 있고, `주석에 추가`를 누르면 설명이 그림 자리에 연결된 주석으로 남습니다.
 
-![흐름도에 붙은 AI 그림 설명을 주석 탭에서 여는 화면](docs/images/scene-figure.gif)
+![그림 설명을 누르고 흐름도를 골라 AI 설명을 받아 주석에 넣는 화면](docs/images/scene-figure.gif)
 
-<sub>두 답변 모두 논문 4쪽 4.2절과 5쪽 흐름도(Fig. 2)에 대해 βnote에서 실제로 받은 것입니다. 위 화면은 그 답변을 같은 과정으로 다시 재생해 녹화했고, 아래 화면은 저장된 설명을 다시 여는 모습입니다. 논문: Duran-Villalobos, Goldrick, Lennox (2020), <i>Computers &amp; Chemical Engineering</i> 132: 106620 · CC BY 4.0</sub>
+<sub>두 답변 모두 논문 4쪽 4.2절과 5쪽 흐름도(Fig. 2)에 대해 βnote에서 실제로 받은 것입니다. 화면은 그 답변을 같은 과정으로 다시 재생해 녹화한 것입니다. 논문: Duran-Villalobos, Goldrick, Lennox (2020), <i>Computers &amp; Chemical Engineering</i> 132: 106620 · CC BY 4.0</sub>
 
 ### 그 밖에 되는 일
 
@@ -192,6 +192,7 @@
 - 올가미로 필기를 둘러 고르면 옮기기 · 크기 조절 · 색 바꾸기 · 복제가 됩니다.
 - 선택 도구로 펜 선 · 도형 · 텍스트 상자를 바로 끌어 옮깁니다. 형광펜은 올가미로 고른 뒤 옮깁니다.
 - 끌어서 다른 쪽 위에 놓으면 그 쪽으로 옮겨집니다(쪽 밖으로 나가지 않습니다).
+- 동시보기에서는 원문의 필기를 끌어 번역 쪽에(반대로도), 노트북 화면에서는 왼쪽 PDF의 펜 선 · 도형 · 텍스트 상자를 끌어 노트북 종이에 놓을 수 있습니다.
 - 문장을 끌어 고르면 형광펜 · 밑줄 · 주석을 바로 붙일 수 있습니다.
 - 필기는 원문과 번역에 각각 따로 저장됩니다.
 - PDF로 저장하면 필기가 다른 PDF 프로그램에서도 보이는 표준 주석으로 들어갑니다.

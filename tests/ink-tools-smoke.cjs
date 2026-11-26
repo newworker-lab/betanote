@@ -94,11 +94,11 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     // the one chosen marks the selection at once and becomes the tool's colour.
     assert.deepEqual(await p.locator('.ink-select-bar [data-ink-text-color]').evaluateAll(n => n.map(b => b.dataset.inkTextColor)), ['underline', 'highlight']);
     const markColours = async () => p.evaluate(() => ({ ...inkState.color })), wasColours = await markColours();
-    await p.locator('.ink-select-bar [data-ink-text-color="highlight"]').click(); const swatches = p.locator('.ink-text-swatches [data-ink-text-swatch]');
-    assert.ok(await swatches.count() >= 4, 'the highlighter colours'); assert.equal(await p.locator('.ink-text-swatches [aria-pressed="true"]').getAttribute('data-ink-text-swatch'), wasColours.highlighter);
-    assert.ok(await p.evaluate(() => { const r = document.querySelector('.ink-text-swatches').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }), 'the colours are in the window');
+    await p.locator('.ink-select-bar [data-ink-text-color="highlight"]').click(); const swatches = p.locator('.ink-mark-swatches [data-ink-text-swatch]');
+    assert.ok(await swatches.count() >= 4, 'the highlighter colours'); assert.equal(await p.locator('.ink-mark-swatches [aria-pressed="true"]').getAttribute('data-ink-text-swatch'), wasColours.highlighter);
+    assert.ok(await p.evaluate(() => { const r = document.querySelector('.ink-mark-swatches').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }), 'the colours are in the window');
     const other = await swatches.evaluateAll((n, was) => n.map(b => b.dataset.inkTextSwatch).find(c => c !== was), wasColours.highlighter), marksBefore = (await strokes(p)).filter(s => s.tool === 'mark' && !s.style).length;
-    await p.locator(`.ink-text-swatches [data-ink-text-swatch="${other}"]`).click(); await saved(p);
+    await p.locator(`.ink-mark-swatches [data-ink-text-swatch="${other}"]`).click(); await saved(p);
     const made = (await strokes(p)).filter(s => s.tool === 'mark' && !s.style); assert.equal(made.length, marksBefore + 1, 'the selection is highlighted'); assert.equal(await p.evaluate(() => [...document.querySelector('.original-pages').inkDoc.strokes.values()].filter(s => s.tool === 'mark' && !s.style).at(-1).color), other, 'in the colour chosen');
     assert.deepEqual(await markColours(), { ...wasColours, highlighter: other }, 'which is now the highlighter\'s colour; the pen keeps its own'); assert.equal(await p.locator('.ink-text-menu').count(), 0);
     await p.keyboard.press('Control+z'); await saved(p); await p.evaluate(was => { inkState.color.highlighter = was; persistInkPrefs(); inkToolbarState(); }, wasColours.highlighter);

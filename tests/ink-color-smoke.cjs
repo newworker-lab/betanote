@@ -46,7 +46,7 @@ const root = path.resolve(__dirname, '..');
   };
   const panel = p => p.locator('.ink-color-panel');
   const structure = (p, selector) => p.evaluate(s => { const pop = document.querySelector(s), rows = [...pop.querySelectorAll('.ink-text-swatches > .ink-text-row')];
-    return { title: !!pop.querySelector('strong'), rows: rows.length, firstRows: rows.slice(0, 4).map(r => r.querySelectorAll('button').length), wheel: !!pop.querySelector('.ink-text-custom input[type="color"]'), pressed: pop.querySelectorAll('[aria-pressed="true"]').length, classes: pop.className.split(' ').includes('ink-text-pop') }; }, selector);
+    return { title: !!pop.querySelector('strong'), rows: rows.length, firstRows: rows.slice(0, 4).map(r => r.querySelectorAll('button').length), stacked: rows.every((r, i) => !i || r.getBoundingClientRect().top >= rows[i - 1].getBoundingClientRect().bottom - 1) && rows.every(r => { const a = r.getBoundingClientRect(), b = pop.getBoundingClientRect(); return a.left >= b.left - 1 && a.right <= b.right + 1 && a.top >= b.top - 1 && a.bottom <= b.bottom + 1; }), wheel: !!pop.querySelector('.ink-text-custom input[type="color"]'), pressed: pop.querySelectorAll('[aria-pressed="true"]').length, classes: pop.className.split(' ').includes('ink-text-pop') }; }, selector);
   try {
     let p = await launch();
     await app.evaluate((_, v) => globalThis.openQueue.push([v]), vault); await p.locator('[data-action="storage"]').first().click();
@@ -58,7 +58,7 @@ const root = path.resolve(__dirname, '..');
     await bar.locator('[data-ink-tool="text"]').click();
     const box = await p.locator('.original-pages .page[data-page="1"]').boundingBox(); await p.mouse.click(box.x + 200, box.y + 300);
     await p.locator('.ink-text-bar [data-tb="color"]').waitFor(); await p.locator('.ink-text-bar [data-tb="color"]').dispatchEvent('pointerdown', { button: 0 });
-    await p.locator('.ink-text-pop[data-kind="color"]').waitFor(); const textPanel = await structure(p, '.ink-text-pop[data-kind="color"]');
+    await p.locator('.ink-text-pop[data-kind="color"]').waitFor(); const textPanel = await structure(p, '.ink-text-pop[data-kind="color"]'); assert.ok(textPanel.stacked, 'the text colour rows lie one under another inside the panel');
     if (photos) await p.screenshot({ path: path.join(photos, 'text-colour-panel.png') });
     // Its swatches by keyboard, as in the + panel: arrows, Home and End move; Enter chooses (the panel closes, the
     // text has the focus again).
@@ -79,7 +79,7 @@ const root = path.resolve(__dirname, '..');
       const kind = tool === 'highlighter' ? 'highlighter' : 'pen';
       // + : the same panel as the text colour panel.
       await add(); await panel(p).waitFor();
-      const inkPanel = await structure(p, '.ink-color-panel');
+      const inkPanel = await structure(p, '.ink-color-panel'); assert.ok(inkPanel.stacked, `the ${kind || ''} colour rows lie one under another inside the panel`);
       assert.deepEqual({ ...inkPanel, rows: undefined }, { ...textPanel, rows: undefined }, `${tool}: built as the text colour panel`);
       assert.equal(inkPanel.rows, 5, `${tool}: four rows of swatches and the row of colours used lately`);
       const tail = await p.evaluate(() => { const pop = document.querySelector('.ink-color-panel').getBoundingClientRect(), plus = document.querySelector('.ink-toolbar [data-ink-add-color]').getBoundingClientRect(); return { below: pop.top >= plus.bottom, side: document.querySelector('.ink-color-panel').dataset.side }; });

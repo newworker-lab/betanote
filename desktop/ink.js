@@ -71,7 +71,7 @@ function inkAttach(container,surface){
   container.inkDoc?.containers.delete(container);container.inkSurface=surface;container.inkDoc=surface?inkDoc(surface):null;
   container.querySelectorAll('.app-ink-layer,.app-ink-live').forEach(node=>node.remove());
   if(!container.inkBound){container.inkBound=true;container.addEventListener('app-pagerendered',event=>{if(container.inkDoc)inkDrawPage(container,event.detail.pageView);});}
-  const doc=container.inkDoc;if(!doc)return;doc.containers.add(container);
+  const doc=container.inkDoc;if(!doc)return;doc.containers.add(container);inkPanes.add(container);
   doc.loaded.then(()=>{if(container.inkDoc===doc)for(const view of inkPageViews(container))inkDrawPage(container,view);});
 }
 function inkLayer(container,view){
@@ -665,6 +665,15 @@ inkReverse=function(action,undo){
   inkQueueMany(doc,[...(hide.length?[{type:'delete',ids:hide.map(s=>s.id)}]:[]),...(show.length?[{type:'restore',ids:show.map(s=>s.id)}]:[])]);
   inkState.selection=null;document.querySelectorAll('.ink-selection').forEach(n=>n.remove());inkRedraw(doc,new Set([...hide,...show].map(s=>s.page)));
 };
+const inkReverseReplace=inkReverse;
+inkReverse=function(action,undo){
+  if(action.type!=='transfer')return inkReverseReplace(action,undo);
+  const [hideDoc,hide,showDoc,show]=undo?[action.to,action.added,action.doc,action.removed]:[action.doc,action.removed,action.to,action.added];
+  for(const s of hide)hideDoc.strokes.delete(s.id);for(const s of show)showDoc.strokes.set(s.id,s);
+  inkQueueMany(hideDoc,[{type:'delete',ids:hide.map(s=>s.id)}]);inkQueueMany(showDoc,[{type:'restore',ids:show.map(s=>s.id)}]);
+  inkState.selection=null;document.querySelectorAll('.ink-selection').forEach(n=>n.remove());inkTextSelect(null);
+  inkRedraw(hideDoc,new Set(hide.map(s=>s.page)));inkRedraw(showDoc,new Set(show.map(s=>s.page)));
+};
 const inkPointerDownBase=inkPointerDown;
 inkPointerDown=function(container,view,canvas,event){
   const tool=inkState.tool;
@@ -714,14 +723,65 @@ function inkGesture(container,view,canvas,event,tool,mode){
 // what is moved never ends up off a page, where nothing shows it. box: the ink's box in the view space of its page;
 // d: the drag there; client: the pointer. Returns the page's view, the box there, and map(), which takes a point of
 // the first page's view space (not yet dragged) to the landing page's view space.
+// The pointer may be over the other PDF pane beside this one (원문 ↔ 번역, each with its own ink) or over a notebook page:
+// the ink then lands there (inkTransfer, inkSendToNotebook). A pane whose source changed since its ink was made, or one
+// with no page drawn yet, takes nothing, and the ink stays in its own pane.
+const inkPanes=new Set();
+function inkPaneAt(container,cx,cy){
+  for(const el of document.elementsFromPoint(cx,cy)){
+    let pane=null;for(const c of inkPanes){if(!c.isConnected)inkPanes.delete(c);else if(c.contains(el)){pane=c;break;}}
+    if(pane)return pane===container||pane.inkDoc&&!pane.inkDoc.stale&&inkPageViews(pane).length?pane:container;
+  }
+  return container;
+}
 function inkDrop(container,view,box,[dx,dy],[cx,cy]){
-  let target=view,best=Infinity;
-  for(const v of inkPageViews(container)){const r=v.div.getBoundingClientRect(),d=Math.hypot(Math.max(r.left-cx,0,cx-r.right),Math.max(r.top-cy,0,cy-r.bottom));if(d<best){best=d;target=v;if(!d)break;}}
+  const nbTarget=globalThis.appInk.nb?.at(cx,cy);if(nbTarget)return inkDropNotebook(view,box,[dx,dy],nbTarget);
+  const pane=inkPaneAt(container,cx,cy);
+  let target=pane===container?view:inkPageViews(pane)[0],best=Infinity;
+  for(const v of inkPageViews(pane)){const r=v.div.getBoundingClientRect(),d=Math.hypot(Math.max(r.left-cx,0,cx-r.right),Math.max(r.top-cy,0,cy-r.bottom));if(d<best){best=d;target=v;if(!d)break;}}
   const a=view.div.getBoundingClientRect(),b=target.div.getBoundingClientRect(),svp=view.viewport,tvp=target.viewport;
   const to=([x,y])=>[(a.left+(x+dx)*a.width/svp.width-b.left)*tvp.width/b.width,(a.top+(y+dy)*a.height/svp.height-b.top)*tvp.height/b.height];
   const [x0,y0]=to([box.x0,box.y0]),[x1,y1]=to([box.x1,box.y1]),w=x1-x0,h=y1-y0;
   const nx=w>=tvp.width?0:Math.min(Math.max(x0,0),tvp.width-w),ny=h>=tvp.height?0:Math.min(Math.max(y0,0),tvp.height-h);
-  return {view:target,box:{x0:nx,y0:ny,x1:nx+w,y1:ny+h},map:v=>{const [x,y]=to(v);return [x+nx-x0,y+ny-y0];}};
+  return {container:pane,view:target,box:{x0:nx,y0:ny,x1:nx+w,y1:ny+h},map:v=>{const [x,y]=to(v);return [x+nx-x0,y+ny-y0];}};
+}
+// Onto a notebook page (t: its element, size in points and place on screen): the ink keeps its size in points, its box
+// goes where it was let go, kept inside the page. point() takes a point of the PDF page's view space to the notebook page.
+function inkDropNotebook(view,box,[dx,dy],t){
+  const a=view.div.getBoundingClientRect(),vp=view.viewport,u=inkScale(vp),b=t.rect,w=(box.x1-box.x0)/u,h=(box.y1-box.y0)/u;
+  const x0=(a.left+(box.x0+dx)*a.width/vp.width-b.left)/b.width*t.width,y0=(a.top+(box.y0+dy)*a.height/vp.height-b.top)/b.height*t.height;
+  const nx=w>=t.width?0:Math.min(Math.max(x0,0),t.width-w),ny=h>=t.height?0:Math.min(Math.max(y0,0),t.height-h);
+  return {nb:t,view,point:([x,y])=>[(x-box.x0)/u+nx,(y-box.y0)/u+ny]};
+}
+// PDF ink as what a notebook page holds: pen and highlighter lines (shapes with them) as its strokes, text boxes as its
+// text items. Marks on the PDF's own words (형광·밑줄) belong to those words and stay (kept).
+function inkForNotebook(strokes,view,plan){
+  const vp=view.viewport,u=inkScale(vp),r2=n=>Math.round(n*100)/100,made={strokes:[],items:[],kept:[]};
+  for(const st of strokes){
+    if(st.tool==='text'){const b=inkBox(st,vp),[x,y]=plan.point([b.x0,b.y0]);
+      made.items.push({id:inkId(),type:'text',x:Math.round(x),y:Math.round(y),w:Math.min(4000,Math.max(24,Math.ceil((b.x1-b.x0)/u)+10)),h:Math.min(4000,Math.max(18,Math.ceil((b.y1-b.y0)/u)+6)),text:st.text,size:Math.min(72,Math.max(6,st.width)),...(st.color?{color:st.color}:{}),...(st.bold?{bold:true}:{}),...(st.italic?{italic:true}:{}),...(st.underline?{underline:true}:{}),...(st.align&&st.align!=='left'?{align:st.align}:{}),...(st.fill?{fill:st.fill}:{}),...(st.border?{border:{...st.border}}:{})});continue;}
+    if(!['pen','highlighter'].includes(st.tool)){made.kept.push(st);continue;}
+    const points=[...st.points];for(let i=0;i<points.length;i+=4){const [x,y]=plan.point(vp.convertToViewportPoint(points[i],points[i+1]));points[i]=r2(x);points[i+1]=r2(y);}
+    made.strokes.push({id:inkId(),tool:st.tool,color:st.color,width:st.width,points,...(st.shape?{shape:st.shape}:{})});
+  }
+  return made;
+}
+// Ink let go of on a notebook page leaves the PDF and is on that page, as one step to undo. False when nothing went
+// (only marks were chosen, or the page is full).
+function inkSendToNotebook(doc,view,ids,plan){
+  const all=ids.map(id=>doc.strokes.get(id)).filter(Boolean),made=inkForNotebook(all,view,plan),moved=all.filter(st=>!made.kept.includes(st));
+  if(!moved.length)return false;
+  const pages=new Set(moved.map(st=>st.page)),gone=moved.map(st=>st.id);
+  const out=()=>{for(const st of moved)doc.strokes.delete(st.id);inkQueueMany(doc,[{type:'delete',ids:gone}]);inkRedraw(doc,pages);};
+  const back=()=>{for(const st of moved)doc.strokes.set(st.id,st);inkQueueMany(doc,[{type:'restore',ids:gone}]);inkRedraw(doc,pages);};
+  if(!globalThis.appInk.nb.take(plan.nb,made.strokes,made.items,{undo:back,redo:out}))return false;
+  out();inkState.selection=null;document.querySelectorAll('.ink-selection').forEach(n=>n.remove());return true;
+}
+// Ink moved from one PDF pane's ink to the other's (원문 ↔ 번역): gone from the first, added to the second, one step to undo.
+function inkTransfer(doc,removed,to,view,added){
+  for(const st of removed)doc.strokes.delete(st.id);for(const st of added)to.strokes.set(st.id,st);
+  inkQueueMany(doc,[{type:'delete',ids:removed.map(st=>st.id)}]);inkQueueMany(to,added.map(stroke=>({type:'add',stroke,geometry:inkGeometry(view)})));
+  inkRecord({doc,to,type:'transfer',removed,added});inkRedraw(doc,new Set(removed.map(st=>st.page)));inkRedraw(to,new Set(added.map(st=>st.page)));
 }
 // Strokes being moved are not drawn where they were (their copies are drawn where they will land).
 function inkHide(doc,ids,view){if(inkState.hidden)return;inkState.hidden={doc,ids:new Set(ids),page:view.id-1};inkRedraw(doc,new Set([view.id-1]));}
@@ -737,6 +797,8 @@ function inkMoveLive(s){
   if(!s.moved&&Math.hypot(d[0],d[1])<s.slop)return inkNoLive;
   s.moved=true;if(!inkState.hidden){inkHide(s.doc,sel.ids,s.view);document.querySelectorAll('.ink-selection').forEach(n=>n.hidden=true);}
   const plan=s.plan=inkDrop(s.container,s.view,sel.box,d,s.client);
+  if(plan.nb){s.live?.end();s.live=null;globalThis.appInk.nb.preview(plan.nb,inkForNotebook(sel.ids.map(id=>s.doc.strokes.get(id)).filter(Boolean),s.view,plan));return inkNoLive;}
+  globalThis.appInk.nb?.preview(null);
   if(s.live?.view!==plan.view){s.live?.end();const v=plan.view;s.live=inkLivePreview(v.div,()=>v.viewport,(ctx,k)=>inkMovePaint(s,ctx,k));s.live.view=v;}
   return s.live;
 }
@@ -807,7 +869,7 @@ function inkOverlayPaint(s,ctx,k){
 }
 function inside(poly,[x,y]){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(yi>y!==yj>y&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;}
 function inkGestureEnd(){
-  const s=inkStroke;inkStroke=null;if(!s)return;document.body.classList.remove('ink-grabbing');s.live?.end();inkUnhide();
+  const s=inkStroke;inkStroke=null;if(!s)return;document.body.classList.remove('ink-grabbing');s.live?.end();inkUnhide();globalThis.appInk.nb?.preview(null);
   const vp=s.view.viewport,last=s.path.at(-1),index=s.view.id-1;
   if(s.mode==='shape'){
     if(Math.hypot(last[0]-s.startView[0],last[1]-s.startView[1])<3)return;
@@ -825,7 +887,9 @@ function inkGestureEnd(){
   if((s.mode==='move'||s.mode==='scale')&&!inkState.selection){inkSelectionDraw(s.container);return;}
   if(s.mode==='move'){
     const sel=inkState.selection,dx=last[0]-s.startView[0],dy=last[1]-s.startView[1];if(!s.moved&&Math.hypot(dx,dy)<s.slop||Math.hypot(dx,dy)<1){inkSelectionDraw(s.container);return;}
-    const plan=inkDrop(s.container,s.view,sel.box,[dx,dy],s.client);inkTransformSelection(s,plan.map,1,plan.box,plan.view);
+    const plan=inkDrop(s.container,s.view,sel.box,[dx,dy],s.client);
+    if(plan.nb){if(!inkSendToNotebook(s.doc,s.view,sel.ids,plan))inkSelectionDraw(s.container);return;}
+    inkTransformSelection(s,plan.map,1,plan.box,plan.view,plan.container);
   }
   if(s.mode==='scale'){
     const sel=inkState.selection,k=inkScaleFactor(sel.box,s.startView,last);if(Math.abs(k-1)<.01)return;
@@ -844,11 +908,12 @@ function inkScaleStart(container,view,event){
   const up=e=>{if(e.pointerId!==inkStroke?.pointerId)return;for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.removeEventListener(type,up);handle.removeEventListener('pointermove',move);if(e.type==='pointerup')inkStroke.path.push(at(e));inkGestureEnd();};
   handle.addEventListener('pointermove',move);for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,up);
 }
-function inkTransformSelection(s,mapView,k,box,target=s.view){
-  const sel=inkState.selection,removed=sel.ids.map(id=>s.doc.strokes.get(id)).filter(Boolean);
+function inkTransformSelection(s,mapView,k,box,target=s.view,pane=s.container){
+  const sel=inkState.selection,removed=sel.ids.map(id=>s.doc.strokes.get(id)).filter(Boolean),to=pane.inkDoc,across=to!==s.doc;
   const added=inkMapped(removed,s.view,mapView,k,target).map(copy=>({...copy,id:inkId(),from:copy.id,createdAt:new Date().toISOString()}));
-  inkReplace(s.doc,s.view,removed,added,new Map([[s.view.id-1,s.view],[target.id-1,target]]));
-  inkState.selection={...sel,page:target.id-1,ids:added.map(a=>a.id),box};inkSelectionDraw(s.container);
+  if(across){for(const st of added)delete st.from;inkTransfer(s.doc,removed,to,target,added);}
+  else inkReplace(s.doc,s.view,removed,added,new Map([[s.view.id-1,s.view],[target.id-1,target]]));
+  inkState.selection={...sel,doc:to,container:pane,page:target.id-1,ids:added.map(a=>a.id),box};inkSelectionDraw(pane);
 }
 // Strokes of a page (view), mapped point by point in its screen space (mapView) and converted back on the page they
 // land on (target; rotation kept), as copies with the old ids, to be given new ones.
@@ -1235,11 +1300,17 @@ function inkTextDrag(at,event){
   const drop=e=>{const r=view.div.getBoundingClientRect();return inkDrop(container,view,box,[(e.clientX-r.left-(event.clientX-rect.left))*sx,(e.clientY-r.top-(event.clientY-rect.top))*sy],[e.clientX,e.clientY]);},placed=()=>inkMapped([hit],view,plan.map,1,plan.view)[0];
   const move=e=>{if(e.pointerId!==event.pointerId)return;if(!moved&&Math.hypot(e.clientX-event.clientX,e.clientY-event.clientY)<=4)return;
     if(!moved){document.querySelectorAll('.ink-text-selected').forEach(n=>n.remove());inkHide(doc,[hit.id],view);}moved=true;document.body.classList.add('ink-grabbing');
-    plan=drop(e);if(live?.view!==plan.view){live?.end();const v=plan.view;live=inkLivePreview(v.div,()=>v.viewport,(ctx,k)=>inkPaint(ctx,placed(),v.viewport,k));live.view=v;}live.request();};
+    plan=drop(e);if(plan.nb){live?.end();live=null;globalThis.appInk.nb.preview(plan.nb,inkForNotebook([hit],view,plan));return;}globalThis.appInk.nb?.preview(null);
+    if(live?.view!==plan.view){live?.end();const v=plan.view;live=inkLivePreview(v.div,()=>v.viewport,(ctx,k)=>inkPaint(ctx,placed(),v.viewport,k));live.view=v;}live.request();};
   const up=e=>{if(e.pointerId!==event.pointerId)return;removeEventListener('pointermove',move,true);removeEventListener('pointerup',up,true);removeEventListener('pointercancel',up,true);document.body.classList.remove('ink-grabbing');
-    live?.end();inkUnhide();if(moved&&e.type==='pointerup')plan=drop(e);const next=moved&&e.type==='pointerup'&&!doc.stale?placed():null;
-    if(!next||plan.view===view&&Math.hypot(next.points[0]-hit.points[0],next.points[1]-hit.points[1])<.5){inkTextSelectionDraw();return;}
-    next.id=inkId();next.from=hit.id;inkReplace(doc,view,[hit],[next],new Map([[view.id-1,view],[plan.view.id-1,plan.view]]));inkTextSelect({container,view:plan.view,id:next.id});};
+    live?.end();inkUnhide();globalThis.appInk.nb?.preview(null);const letGo=moved&&e.type==='pointerup'&&!doc.stale;if(letGo)plan=drop(e);
+    if(letGo&&plan.nb){if(inkSendToNotebook(doc,view,[hit.id],plan))inkTextSelect(null);else inkTextSelectionDraw();return;}
+    const next=letGo?placed():null;
+    if(!next||plan.container===container&&plan.view===view&&Math.hypot(next.points[0]-hit.points[0],next.points[1]-hit.points[1])<.5){inkTextSelectionDraw();return;}
+    next.id=inkId();
+    if(plan.container!==container)inkTransfer(doc,[hit],plan.container.inkDoc,plan.view,[next]);
+    else{next.from=hit.id;inkReplace(doc,view,[hit],[next],new Map([[view.id-1,view],[plan.view.id-1,plan.view]]));}
+    inkTextSelect({container:plan.container,view:plan.view,id:next.id});};
   addEventListener('pointermove',move,true);addEventListener('pointerup',up,true);addEventListener('pointercancel',up,true);
 }
 document.addEventListener('keydown',event=>{
@@ -1414,8 +1485,8 @@ document.addEventListener('click',event=>{
   if(!inkTextMenu)return;
   // The colour dot opens its colours under itself (pressed again, closes them); a colour marks the selection in it.
   const dot=event.target.closest('[data-ink-text-color]');
-  if(dot){const open=dot.getAttribute('aria-expanded')==='true',id=dot.dataset.inkTextColor,kind=INK_MARK_KIND[id];inkTextMenu.querySelector('.ink-text-swatches')?.remove();inkTextMenu.querySelectorAll('[data-ink-text-color]').forEach(b=>b.setAttribute('aria-expanded','false'));if(open)return;
-    const row=document.createElement('div');row.className='ink-text-swatches';row.setAttribute('role','group');row.setAttribute('aria-label',dot.getAttribute('aria-label'));
+  if(dot){const open=dot.getAttribute('aria-expanded')==='true',id=dot.dataset.inkTextColor,kind=INK_MARK_KIND[id];inkTextMenu.querySelector('.ink-mark-swatches')?.remove();inkTextMenu.querySelectorAll('[data-ink-text-color]').forEach(b=>b.setAttribute('aria-expanded','false'));if(open)return;
+    const row=document.createElement('div');row.className='ink-mark-swatches';row.setAttribute('role','group');row.setAttribute('aria-label',dot.getAttribute('aria-label'));
     row.innerHTML=[...new Set([...inkPalettes[kind],...inkState.custom[kind]])].map(c=>`<button type="button" class="ink-color" data-ink-text-swatch="${c}" data-ink-text-for="${id}" style="--ink-color:${c}" aria-label="${inkColorNames[c]||c}" title="${inkColorNames[c]||c}" aria-pressed="${inkState.color[kind]===c}"></button>`).join('');
     inkTextMenu.append(row);row.style.left=`${dot.offsetLeft+dot.offsetWidth/2}px`;dot.setAttribute('aria-expanded','true');
     const over=row.getBoundingClientRect().right-(innerWidth-8);if(over>0)row.style.left=`${dot.offsetLeft+dot.offsetWidth/2-over}px`;return;}

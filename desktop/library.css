@@ -161,6 +161,8 @@ body.ink-active .nb-page{touch-action:none}
 .nb-page[data-board] .nb-ink{bottom:auto}
 .nb-band{position:absolute;left:0;width:100%;z-index:5;pointer-events:none}
 .nb-item{position:absolute;z-index:2;box-sizing:border-box;margin:0}
+/* Where a text box dragged off a PDF page will land on this notebook page. */
+.nb-ghost{position:absolute;z-index:3;box-sizing:border-box;border:1.5px dashed #2563eb;border-radius:4px;pointer-events:none}
 .nb-text textarea{width:100%;height:100%;resize:none;border:0 solid transparent;border-radius:0;outline:1px dashed transparent;outline-offset:1px;background:transparent;font:inherit;font-size:calc(var(--nb-size,12) * 100cqw / var(--nb-w,595));line-height:1.4;padding:2px;box-sizing:border-box}
 .nb-image img{width:100%;height:calc(100% - 100cqw*14/var(--nb-w,595));object-fit:contain;display:block}
 .nb-image figcaption{height:calc(100cqw*14/var(--nb-w,595));line-height:calc(100cqw*14/var(--nb-w,595));overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -704,8 +706,8 @@ body:not(.ink-active) .nb-memo-card:not(.open){cursor:pointer}
 .ink-select-bar [data-ink-text="explain"]{color:var(--accent)}
 /* The colour 밑줄 긋기 and 하이라이트 will use, as a dot beside each; pressed, the tool row's colours of that kind open under it. */
 .ink-text-menu .ink-text-color{width:auto;flex:none;padding:5px 6px 5px 2px;margin-left:-4px}.ink-text-color i{display:block;width:12px;height:12px;border-radius:50%;background:var(--ink-color);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
-.ink-text-swatches{position:absolute;top:calc(100% + 4px);transform:translateX(-50%);display:flex;flex-direction:row;width:max-content;gap:6px;padding:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
-.ink-text-menu .ink-text-swatches .ink-color{width:20px;height:20px;padding:0;border-radius:50%;background:var(--ink-color);flex:none}.ink-text-swatches .ink-color[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.ink-mark-swatches{position:absolute;top:calc(100% + 4px);transform:translateX(-50%);display:flex;flex-direction:row;width:max-content;gap:6px;padding:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.ink-text-menu .ink-mark-swatches .ink-color{width:20px;height:20px;padding:0;border-radius:50%;background:var(--ink-color);flex:none}.ink-mark-swatches .ink-color[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
 
 /* The notebook in its own window: the notebook pane fills it, with the ink tools above. */
 body.notebook-window .notebook-window-main{display:flex;flex-direction:column;height:100vh;min-height:0}
