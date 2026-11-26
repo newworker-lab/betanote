@@ -60,15 +60,15 @@
 
 ### 4. 논문에게 묻기 — 고른 문단도, 그림도 AI가 설명
 
-읽다가 막히는 문단을 끌어 고르고 AI에게 물으면, 그 부분을 풀어 쓴 설명이 문단 자리에 연결된 주석으로 남습니다. 주석을 누르면 본문의 그 자리로 돌아갑니다.
+읽다가 막히는 문단을 끌어 고르고 `주석 추가` → `AI에게 묻기`를 누르면, 그 부분을 풀어 쓴 답이 문단 자리에 연결된 주석으로 남습니다. 넓은 편집 창에서 답을 크게 읽고, 이어서 더 물을 수 있습니다.
 
-![고른 문단에 대한 AI 설명을 주석 탭에서 여는 화면](docs/images/scene-ask.gif)
+![문단을 고르고 주석에서 AI에게 물어 답변을 크게 보는 화면](docs/images/scene-ask.gif)
 
 그림도 같습니다. 도구 줄의 `그림 설명`을 누르고 그림을 끌어 고르면, AI가 그 그림이 무엇을 보여 주는지 본문과 함께 풀어 줍니다.
 
 ![흐름도에 붙은 AI 그림 설명을 주석 탭에서 여는 화면](docs/images/scene-figure.gif)
 
-<sub>논문 4쪽 4.2절과 5쪽 흐름도(Fig. 2)에 대해 βnote에서 실제로 받은 AI 답변을 다시 여는 모습입니다. 논문: Duran-Villalobos, Goldrick, Lennox (2020), <i>Computers &amp; Chemical Engineering</i> 132: 106620 · CC BY 4.0</sub>
+<sub>두 답변 모두 논문 4쪽 4.2절과 5쪽 흐름도(Fig. 2)에 대해 βnote에서 실제로 받은 것입니다. 위 화면은 그 답변을 같은 과정으로 다시 재생해 녹화했고, 아래 화면은 저장된 설명을 다시 여는 모습입니다. 논문: Duran-Villalobos, Goldrick, Lennox (2020), <i>Computers &amp; Chemical Engineering</i> 132: 106620 · CC BY 4.0</sub>
 
 ### 그 밖에 되는 일
 
