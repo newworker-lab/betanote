@@ -1289,6 +1289,8 @@
     '지우개':'Eraser',
     '필기 도구':'Ink tools',
     '펜 색':'Pen colors',
+    '밑줄 색 고르기':'Choose the underline color',
+    '하이라이트 색 고르기':'Choose the highlight color',
     '형광펜 색':'Highlighter colors',
     '추가한 색 {color}':'Added color {color}',
     '추가한 색 · 오른쪽 클릭이나 Delete로 지우기':'Added color · right-click or press Del to remove',

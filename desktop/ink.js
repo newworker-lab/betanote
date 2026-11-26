@@ -1354,6 +1354,7 @@ function closeInkTextMenu(){inkTextMenu?.remove();inkTextMenu=null;}
 // The same actions as a right-click menu and as a small bar over a fresh selection, each with its key.
 const INK_TEXT_ITEMS=[['underline',tr('밑줄 긋기'),'inkUnderline','U'],['highlight',tr('하이라이트'),'inkMark','H'],['annotate',tr('주석 추가'),'annotate','N'],['copy',tr('복사'),'copy','Ctrl+C']];
 const INK_TEXT_KEYS={KeyU:'underline',KeyH:'highlight',KeyN:'annotate'};
+const INK_MARK_KIND={underline:'pen',highlight:'highlighter'};
 // The selection on the source or translated pages, if there is one worth acting on.
 function inkPickedSelection(target){
   const sel=getSelection();if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
@@ -1366,7 +1367,10 @@ function openInkTextMenu(found,x,y,bar){
   closeInkTextMenu();
   // Right-click or a selection: the same row of actions, side by side.
   inkTextMenu=document.createElement('div');inkTextMenu.className='ink-text-menu ink-select-bar';inkTextMenu.setAttribute('role','toolbar');inkTextMenu.setAttribute('aria-label',tr('선택한 문장'));
-  inkTextMenu.innerHTML=INK_TEXT_ITEMS.filter(([id])=>id==='copy'||!inkViewOnly()).map(([id,label,symbol,key])=>`<button type="button" data-ink-text="${id}" title="${label} (${key})" aria-keyshortcuts="${key==='Ctrl+C'?'Control+C':key}">${icon(symbol)}<span>${label}</span><kbd>${key}</kbd></button>`).join('');
+  // Beside 밑줄 긋기 and 하이라이트 a dot in the colour they will use (the pen's and the highlighter's); pressed, it
+  // offers the tool row's colours of that kind, and the one chosen is used at once and kept as that tool's colour.
+  const dot=id=>{const kind=INK_MARK_KIND[id];if(!kind)return '';const name=id==='underline'?tr('밑줄 색 고르기'):tr('하이라이트 색 고르기');return `<button type="button" class="ink-text-color" data-ink-text-color="${id}" aria-haspopup="true" aria-expanded="false" aria-label="${name}" title="${name}"><i style="--ink-color:${inkState.color[kind]}"></i></button>`;};
+  inkTextMenu.innerHTML=INK_TEXT_ITEMS.filter(([id])=>id==='copy'||!inkViewOnly()).map(([id,label,symbol,key])=>`<button type="button" data-ink-text="${id}" title="${label} (${key})" aria-keyshortcuts="${key==='Ctrl+C'?'Control+C':key}">${icon(symbol)}<span>${label}</span><kbd>${key}</kbd></button>${dot(id)}`).join('');
   document.body.append(inkTextMenu);
   const w=inkTextMenu.offsetWidth,h=inkTextMenu.offsetHeight;inkTextMenu.style.left=`${Math.max(8,Math.min(x,innerWidth-w-8))}px`;inkTextMenu.style.top=`${Math.max(8,Math.min(y,innerHeight-h-8))}px`;
   Object.assign(inkTextMenu,found,{bar:Boolean(bar)});if(!bar)inkTextMenu.querySelector('button').focus();
@@ -1407,7 +1411,18 @@ document.addEventListener('keydown',event=>{
   else if(['ArrowDown','ArrowUp','ArrowLeft','ArrowRight'].includes(event.key)&&at>=0){event.preventDefault();const next=event.key==='ArrowDown'||event.key==='ArrowRight';buttons[(at+(next?1:buttons.length-1))%buttons.length].focus();}
 },true);
 document.addEventListener('click',event=>{
-  const item=event.target.closest('[data-ink-text]');if(!item||!inkTextMenu)return;
+  if(!inkTextMenu)return;
+  // The colour dot opens its colours under itself (pressed again, closes them); a colour marks the selection in it.
+  const dot=event.target.closest('[data-ink-text-color]');
+  if(dot){const open=dot.getAttribute('aria-expanded')==='true',id=dot.dataset.inkTextColor,kind=INK_MARK_KIND[id];inkTextMenu.querySelector('.ink-text-swatches')?.remove();inkTextMenu.querySelectorAll('[data-ink-text-color]').forEach(b=>b.setAttribute('aria-expanded','false'));if(open)return;
+    const row=document.createElement('div');row.className='ink-text-swatches';row.setAttribute('role','group');row.setAttribute('aria-label',dot.getAttribute('aria-label'));
+    row.innerHTML=[...new Set([...inkPalettes[kind],...inkState.custom[kind]])].map(c=>`<button type="button" class="ink-color" data-ink-text-swatch="${c}" data-ink-text-for="${id}" style="--ink-color:${c}" aria-label="${inkColorNames[c]||c}" title="${inkColorNames[c]||c}" aria-pressed="${inkState.color[kind]===c}"></button>`).join('');
+    inkTextMenu.append(row);row.style.left=`${dot.offsetLeft+dot.offsetWidth/2}px`;dot.setAttribute('aria-expanded','true');
+    const over=row.getBoundingClientRect().right-(innerWidth-8);if(over>0)row.style.left=`${dot.offsetLeft+dot.offsetWidth/2-over}px`;return;}
+  const swatch=event.target.closest('[data-ink-text-swatch]');
+  if(swatch){const id=swatch.dataset.inkTextFor,kind=INK_MARK_KIND[id],color=swatch.dataset.inkTextSwatch,found={picked:inkTextMenu.picked,source:inkTextMenu.source,container:inkTextMenu.container};
+    if(inkHex(color)){inkState.color[kind]=color;inkRemember(kind,color);persistInkPrefs();inkToolbarState();}closeInkTextMenu();inkTextAction(id,found);return;}
+  const item=event.target.closest('[data-ink-text]');if(!item)return;
   const found={picked:inkTextMenu.picked,source:inkTextMenu.source,container:inkTextMenu.container},choice=item.dataset.inkText;closeInkTextMenu();inkTextAction(choice,found);
 });
 // An annotation from selected source text keeps the text's place on the page, so it can be marked there.

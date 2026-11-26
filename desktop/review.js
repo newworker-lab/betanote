@@ -40,9 +40,9 @@ function reviewRefresh(){
   reviewSummary=reviewCounts(record);const {counts}=reviewSummary;
   const parts=Object.entries(counts).filter(([,n])=>n).map(([k,n])=>`<span class="quality-${k}">${k==='pending'?tr('{label} {n}쪽',{label:reviewLabels[k],n}):`${reviewLabels[k]} ${n}`}</span>`);
   // An icon in the tool row, not a line of counts: the counts are its tip (and the dialog it opens), and a red dot says
-  // that paragraphs are untranslated or need a look. The counts stay in the button, out of sight, for screen readers.
+  // that paragraphs are untranslated or need a look. The counts are in its name for screen readers (and kept in the button, not shown).
   const plain=Object.entries(counts).filter(([,n])=>n).map(([k,n])=>k==='pending'?tr('{label} {n}쪽',{label:reviewLabels[k],n}):`${reviewLabels[k]} ${n}`).join(' · '),alert=Boolean(counts.missing||counts.review);
-  tools.insertAdjacentHTML('beforeend',`<button type="button" class="pdf-tool translation-quality${alert?' quality-alert':''}" data-action="translation-quality" aria-label="${tr('번역 결과 상태')}" title="${tr('번역 결과 상태')}: ${esc(plain)}">${icon('activity')}<span class="pdf-tool-label">${tr('번역 결과 상태')}</span><span class="quality-counts">${parts.join(' · ')}</span></button>`);
+  tools.insertAdjacentHTML('beforeend',`<button type="button" class="pdf-tool translation-quality${alert?' quality-alert':''}" data-action="translation-quality" aria-label="${tr('번역 결과 상태')}: ${esc(plain)}" title="${tr('번역 결과 상태')}: ${esc(plain)}">${icon('activity')}<span class="pdf-tool-label">${tr('번역 결과 상태')}</span><span class="quality-counts">${parts.join(' · ')}</span></button>`);
 }
 const reviewBaseRefresh=refreshTranslationPane;
 refreshTranslationPane=function(){reviewBaseRefresh();reviewRefresh();};

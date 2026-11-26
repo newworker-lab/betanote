@@ -86,7 +86,7 @@ body.large .paper-item h3{font-size:17px}
 .evidence{font-size:11px;padding:0 5px;margin-left:2px;border:1px solid #93c5fd;border-radius:9px;background:#eff6ff;color:#1d4ed8}
 .ai-evidence{position:absolute;z-index:6;outline:3px solid rgba(37,99,235,.8);background:rgba(37,99,235,.12);border-radius:3px;pointer-events:none}
 /* Translation result quality and corrections. */
-.translation-quality{position:relative}.translation-quality .quality-counts{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.translation-quality{position:relative}.translation-quality .quality-counts{display:none}
 .translation-quality.quality-alert::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#d92d20}
 .translation-quality .quality-missing,.translation-quality .quality-review{color:#b42318;font-weight:600}
 .translation-quality .quality-corrected{color:#047857}
@@ -702,6 +702,10 @@ body:not(.ink-active) .nb-memo-card:not(.open){cursor:pointer}
 .ink-select-bar button{width:auto;flex:none;padding:5px 8px;gap:5px;white-space:nowrap}
 .ink-select-bar button kbd{margin-left:2px}
 .ink-select-bar [data-ink-text="explain"]{color:var(--accent)}
+/* The colour 밑줄 긋기 and 하이라이트 will use, as a dot beside each; pressed, the tool row's colours of that kind open under it. */
+.ink-text-menu .ink-text-color{width:auto;flex:none;padding:5px 6px 5px 2px;margin-left:-4px}.ink-text-color i{display:block;width:12px;height:12px;border-radius:50%;background:var(--ink-color);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.ink-text-swatches{position:absolute;top:calc(100% + 4px);transform:translateX(-50%);display:flex;flex-direction:row;width:max-content;gap:6px;padding:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.ink-text-menu .ink-text-swatches .ink-color{width:20px;height:20px;padding:0;border-radius:50%;background:var(--ink-color);flex:none}.ink-text-swatches .ink-color[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
 
 /* The notebook in its own window: the notebook pane fills it, with the ink tools above. */
 body.notebook-window .notebook-window-main{display:flex;flex-direction:column;height:100vh;min-height:0}

@@ -58,7 +58,7 @@ input[type="checkbox"]{accent-color:var(--primary)}input::placeholder,textarea::
 .reader-panel>.tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0}.reader-panel>.tabs button{min-width:0;padding:9px 2px;white-space:nowrap}
 
 /* Collapsed panel openers live at the two ends of the top bar. Hover edges stay invisible. */
-.topbar-leading{display:flex;align-items:center;gap:12px;min-width:0}.sidebar-opener{display:none;flex-shrink:0}
+.topbar-leading{display:flex;align-items:center;gap:12px;min-width:0}.sidebar-opener{display:inline-flex;flex-shrink:0}.sidebar-opener[aria-expanded="true"]{color:var(--accent)}
 .left-collapsed .topbar [data-sidebar-open="left"],.right-collapsed .topbar [data-sidebar-open="right"]{display:inline-flex}
 .sidebar-edge,.shell.left-collapsed>.left-edge,.shell.right-collapsed .right-edge{cursor:default}
 
@@ -85,3 +85,5 @@ input[type="checkbox"]{accent-color:var(--primary)}input::placeholder,textarea::
 /* The word mark beside the icon, at the icon's scale (78 of its units are the icon's 34px): its β reaches a little below
    the icon, as in the brand logo (brand/<id>-logo.svg). note is the text colour made lighter on a light screen, a light grey on a dark one. */
 .logo svg.logo-word{width:93.3px;height:34px;flex:none;display:block;overflow:visible;margin-left:-4px}.logo .logo-word-note{stroke:currentColor;opacity:.72}body.dark .logo .logo-word-note{stroke:#c9cdd2;opacity:1}
+/* A narrow window: the top bar keeps its two sidebar buttons, and the search gives way (down to its icon) before it would lie over the view switch. */
+@media(max-width:950px){.topbar-trailing .search{min-width:38px;flex-basis:150px}.topbar{gap:8px}}
