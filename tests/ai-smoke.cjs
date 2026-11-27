@@ -81,9 +81,14 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.evaluate(() => { const span = document.querySelector('.original-pages .page[data-page="2"] .textLayer span'), range = document.createRange(); range.selectNodeContents(span); getSelection().removeAllRanges(); getSelection().addRange(range); });
     await p.evaluate(() => document.activeElement?.blur()); await p.keyboard.press('e'); await p.waitForTimeout(300); assert.equal(await p.evaluate(() => document.querySelector('#dialog').open), false, 'E does nothing now');
     await p.keyboard.press('n'); await p.locator('#annotation-quote').waitFor(); assert.match(await p.locator('#annotation-quote').inputValue(), /Participants read two-column/);
+    // Chromium fires a dialog's close event with the next frame, and the reader's re-render can make that frame slow
+    // (a large window, a real mouse-drag selection under Xvfb). The form's close is held back here past the moment the
+    // editor would open; arriving late, it must not shut the editor that AI에게 묻기 opens.
+    await p.evaluate(() => { const hold = event => { if (event.target !== dialog) return; document.removeEventListener('close', hold, true); event.stopImmediatePropagation(); setTimeout(() => dialog.dispatchEvent(new Event('close')), 300); }; document.addEventListener('close', hold, true); });
     await p.locator('#dialog [data-action="save-annotation-ask"]').click();
     // The annotation is saved with its passage (no text of its own yet) and opens in the wide editor with the AI panel.
     await p.locator('.annotation-editor-dialog .note-ai:not([hidden]) #editor-ai-instruction').waitFor();
+    await p.waitForTimeout(1000); assert.equal(await p.locator('.annotation-editor-dialog .note-ai:not([hidden]) #editor-ai-instruction').count(), 1, 'the AI panel stays open after the form\'s late close');
     assert.equal(await p.locator('.annotation-editor-dialog #editor-ai-selection').isChecked(), true, 'the quoted passage goes with the question');
     await p.locator('#editor-ai-instruction').fill('이 문장을 설명해 줘'); await p.locator('[data-editor-ai-send]').click(); await p.locator('[data-editor-ai-take="append"]').click();
     const passageRequest = await app.evaluate(() => globalThis.requests.at(-1));

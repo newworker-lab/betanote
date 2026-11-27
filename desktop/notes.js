@@ -721,11 +721,13 @@ function openAnnotationEditor(id,ai=null){
   // The pending text of the card's own field goes first, then the editor shows what is saved or typed.
   const pending=annotationSaves.get(id)?.patch.body,root=dialog.querySelector('.dialog-inner'),area=root.querySelector('#note-editor');
   area.removeAttribute('data-note');area.dataset.annotBody=id;area.maxLength=20000;area.value=pending??a.body??'';
-  const ed=mountNoteEditor(root,ANNOT_EDITOR_KEY,{memo:false});ed.aiTarget=annotationAiTarget(id,ed);annotationEditor={id,ed};
+  const ed=mountNoteEditor(root,ANNOT_EDITOR_KEY,{memo:false});ed.aiTarget=annotationAiTarget(id,ed);annotationEditor={id,ed,root};
   if(ai)editorAiToggle(ed,ed.aiTarget.selection()||ai.selection||null);
 }
 dialog.addEventListener('close',()=>{
-  if(!annotationEditor)return;const {id,ed}=annotationEditor;annotationEditor=null;ed.destroy();
+  // Chromium fires close with the next frame: one that comes while the open dialog still shows this editor
+  // belongs to the modal before it (modal() always replaces the dialog's content).
+  if(!annotationEditor||dialog.open&&dialog.contains(annotationEditor.root))return;const {id,ed}=annotationEditor;annotationEditor=null;ed.destroy();
   dialog.classList.remove('note-editor-dialog','annotation-editor-dialog');dialog.style.height='';dialog.style.width='';
   // The card shows what was written in the wide editor.
   flushAnnotation(id).catch(()=>{}).finally(()=>refreshAnnotations());
