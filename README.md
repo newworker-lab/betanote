@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="버전 1.1.7" src="https://img.shields.io/badge/version-1.1.7-1b64da">
+  <img alt="버전 1.1.8" src="https://img.shields.io/badge/version-1.1.8-1b64da">
   <img alt="Windows · Linux · macOS(베타)" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20(beta)-4e5968">
   <img alt="Electron 45" src="https://img.shields.io/badge/Electron-45-47848f">
   <img alt="로컬 우선" src="https://img.shields.io/badge/data-local--first-0e7c66">

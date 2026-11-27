@@ -4,7 +4,7 @@ const insightSections={question:'연구 질문',method:'방법',result:'결과',
 const sectionLabel=key=>({question:tr('연구 질문'),method:tr('방법'),result:tr('결과'),limitation:tr('한계'),contribution:tr('기여'),explanation:tr('설명',null,'section'),answer:tr('답변')})[key];
 const kindLabel=kind=>({summary:tr('AI 요약'),explain:tr('선택 설명'),ask:tr('질문')})[kind]??kind;
 const insightState={results:new Map(),blocks:new Map(),busy:null,selection:null,error:'',open:null,heights:new Map()};
-const INSIGHT_NOTE=tr('질문과 AI 요약은 아래 AI 기록에 초안으로 따로 저장되고, 메모에는 “노트로 채택”을 누를 때만 들어갑니다. 문장에 대한 질문은 원문에서 글을 고른 뒤 주석 추가(N)를 누르고, 그 주석에서 AI에게 물으면 됩니다. 근거 쪽 번호를 누르면 원문 위치로 이동합니다.');
+const INSIGHT_NOTE=tr('이 탭의 AI는 논문(원문) 전체를 보고 답합니다. 질문과 AI 요약은 아래 AI 기록에 초안으로 남고, ‘메모로 저장’을 누르면 새 메모가 됩니다. AI 요약은 요약 칸(연구 질문 · 방법 · 결과 · 한계)이 모두 비어 있으면 받는 즉시 그 칸에 들어갑니다. 칸에 글이 있으면 그대로 두고, ‘요약 칸에 넣기’로 넣을 수 있습니다. 메모 · 주석 · 요약 칸 하나를 두고 묻거나 고치려면 그 카드의 AI 단추(✦)를 쓰세요. 그쪽은 그 글만 보내고 논문 전체는 보내지 않습니다. 근거 쪽 번호를 누르면 원문 위치로 이동합니다.');
 paths.info='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 11v5.5 M11.3 7.8a.7.7 0 1 0 1.4 0a.7.7 0 1 0-1.4 0';
 const basePanelInsight=panel;
 panel=function(){
@@ -19,7 +19,7 @@ function insightPanel(){
   const busy=insightState.busy?.key===key,blocked=recordsUnreadable();
   // In the 요약 tab: the question box and the one-click tools above the sections (their results, the AI
   // 기록, are listed under the sections by insightResultsPanel). 선택 설명 is saved in the 주석 tab.
-  return `<section class="insight-panel"><form class="insight-ask note-ai-composer" data-insight-ask><input id="insight-question" maxlength="4000" title="${tr('쪽 번호(예: 3쪽, p. 5)를 적거나 원문 문장을 붙여 넣으면 그 쪽의 본문을 함께 보내 답합니다')}" placeholder="${tr('이 자료(원문)에 질문하기 · 쪽 번호나 원문 문장을 넣어도 됩니다')}" aria-label="${tr('이 자료에 질문')}" ${busy?'disabled':''}><button class="composer-icon composer-send" title="${blocked?tr('이 자료의 AI 기록 파일을 읽을 수 없어 AI 요청을 보내지 않습니다.'):tr('질문 보내기')}" aria-label="${tr('질문')}" ${busy||blocked?'disabled':''}>${icon('composerSend')}</button></form><div class="insight-actions"><button class="secondary small" data-action="ai-summary" ${busy||blocked?'disabled':''}${blocked?` title="${tr('이 자료의 AI 기록 파일을 읽을 수 없어 AI 요청을 보내지 않습니다.')}"`:''}>${tr('AI 요약')}</button><span class="insight-info"><button type="button" class="insight-info-button" data-insight-info aria-label="${tr('AI 결과 안내')}" aria-expanded="false" aria-describedby="insight-info-tip">${icon('info')}</button><span class="insight-info-tip" id="insight-info-tip" role="tooltip">${INSIGHT_NOTE}</span></span></div>${busy?`<p class="insight-status" role="status">${esc(insightState.busy.message)} <button class="secondary small" data-action="ai-cancel">${tr('취소')}</button></p>`:''}${insightState.error?`<p class="insight-status error" role="alert">${esc(insightState.error)}</p>`:''}</section>`;
+  return `<section class="insight-panel"><form class="insight-ask note-ai-composer" data-insight-ask><input id="insight-question" maxlength="4000" title="${tr('쪽 번호(예: 3쪽, p. 5)를 적거나 원문 문장을 붙여 넣으면 그 쪽의 본문을 함께 보내 답합니다')}" placeholder="${tr('논문 전체에 질문하기 · 쪽 번호나 원문 문장을 넣어도 됩니다')}" aria-label="${tr('이 자료에 질문')}" ${busy?'disabled':''}><button class="composer-icon composer-send" title="${blocked?tr('이 자료의 AI 기록 파일을 읽을 수 없어 AI 요청을 보내지 않습니다.'):tr('질문 보내기')}" aria-label="${tr('질문')}" ${busy||blocked?'disabled':''}>${icon('composerSend')}</button></form><div class="insight-actions"><button class="secondary small" data-action="ai-summary" ${busy||blocked?'disabled':''}${blocked?` title="${tr('이 자료의 AI 기록 파일을 읽을 수 없어 AI 요청을 보내지 않습니다.')}"`:''}>${tr('AI 요약')}</button><span class="insight-info"><button type="button" class="insight-info-button" data-insight-info aria-label="${tr('AI 결과 안내')}" aria-expanded="false" aria-describedby="insight-info-tip">${icon('info')}</button><span class="insight-info-tip" id="insight-info-tip" role="tooltip">${INSIGHT_NOTE}</span></span></div>${busy?`<p class="insight-status" role="status">${esc(insightState.busy.message)} <button class="secondary small" data-action="ai-cancel">${tr('취소')}</button></p>`:''}${insightState.error?`<p class="insight-status error" role="alert">${esc(insightState.error)}</p>`:''}</section>`;
 }
 function insightResultsPanel(){
   const results=insightState.results.get(targetKey());
@@ -33,7 +33,7 @@ function insightBody(r){
   const cov=r.coverage||{},scope=r.kind==='ask'?(cov.focusPages?.length?(cov.quoted?tr('붙여 넣은 문장이 있는 {pages}쪽 본문 포함',{pages:cov.focusPages.join('·')}):tr('{pages}쪽 본문 포함',{pages:cov.focusPages.join('·')}))+' · ':'')+tr('문단 {n}개 (전체 {total}쪽 중)',{n:cov.blocks||0,total:cov.totalPages||'?'}):r.kind==='explain'?tr('{page}쪽 선택 + 인접 쪽',{page:r.page}):cov.partial?tr('일부만 처리: {done}/{total}쪽 · 전체 요약 아님',{done:cov.pages?.length||0,total:cov.totalPages}):tr('전체 {total}쪽',{n:cov.totalPages,total:cov.totalPages});
   const hash=insightState.hash?.key===targetKey()?insightState.hash.value:null,stale=hash&&r.sourceHash!==hash;
   const sections=Object.entries(r.sections||{}).filter(([,list])=>list.length).map(([key,list])=>`<h4>${esc(sectionLabel(key)||key)}</h4><ul>${list.map(c=>`<li class="${c.unsupported?'unsupported':''}"><span class="basis ${c.basis}">${c.basis==='model'?tr('모델 해석'):tr('원문 진술')}</span> ${esc(c.text)} ${c.evidence.map(e=>`<button class="evidence" data-evidence="${esc(r.id)}|${esc(e.blockId)}" title="${esc(e.quote)}">p.${e.page}</button>`).join('')}${c.unsupported?`<span class="pill amber">${tr('근거 부족')}</span>`:''}</li>`).join('')}</ul>`).join('');
-  return `<p class="small muted">${esc(r.model)} · ${esc(scope)}${stale?` · <b>${tr('원문이 바뀌어 위치 확인 필요')}</b>`:''}</p>${r.question?`<p class="insight-q">Q. ${esc(r.question)}</p>`:''}${r.selection?`<blockquote>${esc(r.selection)}</blockquote>`:''}${r.translation?`<p><span class="basis paper">${tr('번역')}</span> ${esc(r.translation)}</p>`:''}${r.insufficient?`<p class="pill amber">${tr('이 자료의 내용으로는 답할 근거가 부족합니다.')}</p>`:''}${sections}${r.rejected?.length?`<p class="small muted">${tr('존재하지 않는 근거 {n}개는 제외했습니다.',{n:r.rejected.length})}</p>`:''}${r.followUps?.length?`<h4>${tr('이어서 물은 질문')}</h4>${r.followUps.map(f=>`<div class="insight-follow md">${renderNote(f.text)}</div>`).join('')}`:''}<footer><button class="secondary small" data-ai-adopt="${esc(r.id)}">${tr('노트로 채택')}${r.adoptions?.length?` (${r.adoptions.length})`:''}</button></footer>`;
+  return `<p class="small muted">${esc(r.model)} · ${esc(scope)}${stale?` · <b>${tr('원문이 바뀌어 위치 확인 필요')}</b>`:''}</p>${r.question?`<p class="insight-q">Q. ${esc(r.question)}</p>`:''}${r.selection?`<blockquote>${esc(r.selection)}</blockquote>`:''}${r.translation?`<p><span class="basis paper">${tr('번역')}</span> ${esc(r.translation)}</p>`:''}${r.insufficient?`<p class="pill amber">${tr('이 자료의 내용으로는 답할 근거가 부족합니다.')}</p>`:''}${sections}${r.rejected?.length?`<p class="small muted">${tr('존재하지 않는 근거 {n}개는 제외했습니다.',{n:r.rejected.length})}</p>`:''}${r.followUps?.length?`<h4>${tr('이어서 물은 질문')}</h4>${r.followUps.map(f=>`<div class="insight-follow md">${renderNote(f.text)}</div>`).join('')}`:''}<footer>${r.kind==='summary'?`<button class="secondary small" data-ai-fill="${esc(r.id)}" title="${tr('연구 질문 · 방법 · 결과 · 한계 칸 뒤에 덧붙입니다(기여는 결과 칸에)')}">${tr('요약 칸에 넣기')}</button>`:''}<button class="secondary small" data-ai-adopt="${esc(r.id)}" title="${tr('이 결과를 새 메모로 저장합니다')}">${tr('메모로 저장')}${r.adoptions?.length?` (${r.adoptions.length})`:''}</button></footer>`;
 }
 function insightCard(r){
   const open=r.id===insightState.open,title=insightTitle(r),when=new Date(r.createdAt);
@@ -100,6 +100,12 @@ async function insightSend(){
     const result=await window.appApi.aiRun(vault,paperId,attachmentId,pending.kind,model,{sourceHash:pending.source.hash,blocks:pending.source.blocks,...pending.extra,connection:choice.connection});
     if(result.kind==='explain'){const snapshot=await explainToAnnotation(vault,paperId,attachmentId,result);if(state.storageKey===vault&&state.selected===paperId){insightState.busy=null;applyAnnotations(snapshot,'주석');const added=itemAnnotations.filter(a=>a.kind==='explain'&&a.paperId===paperId).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))[0];if(added)globalThis.appShowAnnotation?.(added.id);toast(tr('AI 선택 설명을 주석 탭에 추가했습니다.'));}return;} // i18n:keep — tab value
     const list=insightState.results.get(pending.key)||[];list.unshift(result);insightState.results.set(pending.key,list);insightState.open=result.id;
+    // An AI summary goes into the four summary parts as soon as it comes when they are all empty (and its paper is
+    // still the one open). Parts with writing in them are left as they are: the summary waits in the AI history, where
+    // 요약 칸에 넣기 puts it in.
+    if(result.kind==='summary'&&targetKey()===pending.key){insightState.busy=null;
+      if([0,1,2,3].every(i=>!notes[`${state.selected}-summary-${i}`]?.trim()))await adoptInsight(result.id,'cards');
+      else toast(tr('요약 칸에 이미 글이 있어 그대로 두었습니다. 새 요약은 아래 AI 기록의 ‘요약 칸에 넣기’로 넣을 수 있습니다.'),6000);}
   }catch(error){insightState.error=plainError(error);}
   finally{insightState.busy=null;refreshInsightPanel();}
 }
@@ -120,20 +126,37 @@ function showEvidence(resultId,blockId){
   if(view?.renderingState===3)place();
   else{const once=event=>{if(event.detail.index!==e.page-1)return;container.removeEventListener('app-pagerendered',once);place();};container.addEventListener('app-pagerendered',once);setTimeout(()=>container.removeEventListener('app-pagerendered',once),5000);}
 }
-// Adopting appends to the user's notes with page markers; nothing is replaced.
-async function adoptInsight(id){
-  const r=insightState.results.get(targetKey())?.find(x=>x.id===id);if(!r)return;
+// Keeping a result. Every result can be saved as a memo of its own (메모로 저장: the whole result, its kind as its
+// title), so a result always lands in the same place. An AI summary fills the AI tab's four summary parts as it comes
+// (insightSend), and again with 요약 칸에 넣기: each part after what is there, 기여 after 결과. Nothing is replaced;
+// page markers are kept.
+async function adoptInsight(id,into='memo'){
+  const r=insightState.results.get(targetKey())?.find(x=>x.id===id);if(!r)return;if(into==='cards'&&r.kind!=='summary')into='memo';
   const language=resultLanguage(r),say=(name,values)=>memoLabels().memoLabel(name,language,values);
   const line=c=>`• ${c.text}${c.evidence.length?' ['+[...new Set(c.evidence.map(e=>'p.'+e.page))].join(', ')+']':''}${c.basis==='model'?' '+say('modelReading'):''}${c.unsupported?' '+say('noEvidence'):''}`;
-  const tag=`[${say('resultHead',{kind:r.kind,model:r.model,date:memoLabels().memoDate(r.createdAt,language)})}]`;const added=[];
+  const tag=`[${say('resultHead',{kind:r.kind,model:r.model,date:memoLabels().memoDate(r.createdAt,language)})}]`;const added=[];let memoKey=null;
   const append=(noteKey,text)=>{if(!text)return;setNote(noteKey,(notes[noteKey]?notes[noteKey]+'\n\n':'')+text);added.push(text);};
-  if(r.kind==='summary'){['question','method','result','limitation'].forEach((k,i)=>append(`${state.selected}-summary-${i}`,r.sections[k]?.length?tag+'\n'+r.sections[k].map(line).join('\n'):''));append(`${state.selected}-메모`,r.sections.contribution?.length?tag+say('contribution')+'\n'+r.sections.contribution.map(line).join('\n'):'');} // i18n:keep — stored memo key
-  // A selection explanation becomes a memo of its own, linked back to its page.
-  else if(r.kind==='explain'){const text=[`[${say('explainHead',{file:noteHeadName(activeAttachment()?.name),page:r.page||1,model:r.model})}]`,r.selection&&'> '+r.selection.replace(/\n/g,'\n> '),r.translation&&say('translationLine')+r.translation,...Object.values(r.sections).flat().map(line),r.insufficient&&say('noEvidence')].filter(Boolean).join('\n');newMemo(text,say('explainTitle',{page:r.page||1}));added.push(text);}
-  else append(`${state.selected}-메모`,[tag,r.question&&'Q. '+r.question,r.selection&&'> '+r.selection,r.translation&&say('translationLine')+r.translation,...Object.values(r.sections).flat().map(line),r.insufficient&&say('noEvidence')].filter(Boolean).join('\n')); // i18n:keep — stored memo key
+  if(into==='cards'){
+    ['question','method','result','limitation'].forEach((k,i)=>append(`${state.selected}-summary-${i}`,r.sections[k]?.length?tag+'\n'+r.sections[k].map(line).join('\n'):''));
+    append(`${state.selected}-summary-2`,r.sections.contribution?.length?tag+say('contribution')+'\n'+r.sections.contribution.map(line).join('\n'):'');
+  }else if(r.kind==='explain'){const text=[`[${say('explainHead',{file:noteHeadName(activeAttachment()?.name),page:r.page||1,model:r.model})}]`,r.selection&&'> '+r.selection.replace(/\n/g,'\n> '),r.translation&&say('translationLine')+r.translation,...Object.values(r.sections).flat().map(line),r.insufficient&&say('noEvidence')].filter(Boolean).join('\n');memoKey=newMemo(text,say('explainTitle',{page:r.page||1}));added.push(text);}
+  else{
+    // A summary keeps its parts under their names; an answer keeps its question.
+    const parts=r.kind==='summary'?Object.entries(r.sections||{}).filter(([,list])=>list.length).map(([key,list])=>`**${sectionLabel(key)||key}**\n${list.map(line).join('\n')}`):Object.values(r.sections||{}).flat().map(line);
+    const text=[tag,r.question&&'Q. '+r.question,r.selection&&'> '+r.selection,r.translation&&say('translationLine')+r.translation,...parts,r.insufficient&&say('noEvidence')].filter(Boolean).join(r.kind==='summary'?'\n\n':'\n');
+    const title=r.kind==='ask'&&r.question?'Q. '+(r.question.length>60?r.question.slice(0,59)+'…':r.question):kindLabel(r.kind);
+    memoKey=newMemo(text,title);added.push(text);
+  }
+  if(!added.length){toast(tr('넣을 내용이 없습니다.'));return;}
+  // The parts show what was put in; only a memo is counted as kept from the result (메모로 저장 (n)).
+  if(into==='cards'){await desktopNotes();refreshSummary();refreshInsightPanel();toast(tr('요약 칸(연구 질문 · 방법 · 결과 · 한계)에 넣었습니다.'));return;}
   await desktopNotes();const updated=await window.appApi.aiAdopt(state.storageKey,state.selected,state.selectedAttachment,id,added.join('\n\n'));
-  const list=insightState.results.get(targetKey());list[list.findIndex(x=>x.id===id)]=updated;refreshInsightPanel();toast(r.kind==='summary'?tr('요약 탭의 각 항목 뒤에 추가했습니다.'):r.kind==='explain'?tr('선택 설명을 새 메모로 추가했습니다.'):tr('메모 끝에 추가했습니다.'));
+  const list=insightState.results.get(targetKey());list[list.findIndex(x=>x.id===id)]=updated;refreshInsightPanel();
+  // Where it went, and a way there.
+  toast(tr('새 메모로 저장했습니다.'),6000);const t=document.querySelector('#toast');
+  if(t&&memoKey){t.insertAdjacentHTML('beforeend',` <button type="button" class="toast-action" data-open-memo="${esc(memoKey)}">${tr('메모 보기')}</button>`);}
 }
+document.addEventListener('click',event=>{const b=event.target.closest?.('#toast [data-open-memo]');if(!b)return;document.querySelector('#toast')?.classList.remove('show');openMemoKey=b.dataset.openMemo;showPanelTab('메모');}); // i18n:keep — tab value
 Object.assign(actions,{
   'ai-summary':runDesktop(()=>insightConfirm('summary')),
   'ai-send':runDesktop(insightSend),
@@ -165,17 +188,17 @@ function insightWide(id,{ai=false}={}){
   const root=dialog.querySelector('.insight-view'),ed=insightMountAi(root,where,r,window);insightView={ed,where,id,root};
   if(ai)editorAiToggle(ed,null);
 }
-dialog.addEventListener('close',()=>{if(insightView){editorAiClose(insightView.ed);insightView=null;}});
+dialog.addEventListener('close',()=>{if(insightView&&!(dialog.open&&insightView.root.isConnected)){editorAiClose(insightView.ed);insightView=null;}}); // a late close of an earlier opening leaves this view
 function openInsightWindow(id){
   const where=insightWhere(),r=insightFind(where,id);if(!r)return;if(dialog.open&&insightView?.id===id)dialog.close();
   openViewWindow(viewWindowName('insight',where.vault,where.key,id),`AI · ${insightTitle(r)}`,(child,main)=>{
     main.classList.add('note-window','insight-window');main.innerHTML=insightViewHtml(r,true);
     const root=main.querySelector('.insight-view'),ed=insightMountAi(root,where,r,child),view={ed,where,id,root};insightWindows.add(view);
-    // Its evidence and 노트로 채택 act in the app (the app's own handlers do not hear this window).
+    // Its evidence, 메모로 저장 and 요약 칸에 넣기 act in the app (the app's own handlers do not hear this window).
     root.addEventListener('click',event=>{
-      const evidence=event.target.closest('[data-evidence]'),adopt=event.target.closest('[data-ai-adopt]');if(!evidence&&!adopt)return;
+      const evidence=event.target.closest('[data-evidence]'),adopt=event.target.closest('[data-ai-adopt],[data-ai-fill]');if(!evidence&&!adopt)return;
       if(!insightHere(where)){toast(tr('이 결과의 자료를 다시 열어야 합니다.'));return;}
-      if(evidence){const [rid,block]=evidence.dataset.evidence.split('|');window.focus();showEvidence(rid,block);}else runDesktop(()=>adoptInsight(adopt.dataset.aiAdopt))();
+      if(evidence){const [rid,block]=evidence.dataset.evidence.split('|');window.focus();showEvidence(rid,block);}else runDesktop(()=>adoptInsight(adopt.dataset.aiAdopt||adopt.dataset.aiFill,adopt.dataset.aiFill?'cards':'memo'))();
     });
     child.addEventListener('pagehide',()=>{editorAiClose(ed);insightWindows.delete(view);});
   });
@@ -202,7 +225,7 @@ document.addEventListener('click',event=>{
     if(!card.classList.contains('open')&&!event.target.closest('button,a,input')){insightState.open=card.dataset.insight;refreshInsightPanel();document.querySelector('.insight-card.open')?.focus?.();return;}
   }
   const evidence=event.target.closest('[data-evidence]');if(evidence){if(evidence.closest('dialog'))dialog.close();const [id,block]=evidence.dataset.evidence.split('|');showEvidence(id,block);}
-  const adopt=event.target.closest('[data-ai-adopt]');if(adopt)runDesktop(()=>adoptInsight(adopt.dataset.aiAdopt))();
+  const adopt=event.target.closest('[data-ai-adopt],[data-ai-fill]');if(adopt)runDesktop(()=>adoptInsight(adopt.dataset.aiAdopt||adopt.dataset.aiFill,adopt.dataset.aiFill?'cards':'memo'))();
   const remove=event.target.closest('[data-ai-remove]');if(remove)runDesktop(async()=>{await window.appApi.aiRemove(state.storageKey,state.selected,state.selectedAttachment,remove.dataset.aiRemove);const list=insightState.results.get(targetKey())||[];insightState.results.set(targetKey(),list.filter(r=>r.id!==remove.dataset.aiRemove));refreshInsightPanel();})();
 });
 

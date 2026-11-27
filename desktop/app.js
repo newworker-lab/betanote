@@ -19,7 +19,7 @@ let state={leftCollapsed:false,rightCollapsed:false,split:50,screen:'welcome',st
 // Only for these fixed values: never for a reader's own tag or collection names, which are shown as written (a tag named '메모' or '전체' stays so).
 // The heading of a view: the app's own views (all items, recently read, favorites) in the display language; any other view is named by the reader (a folder, collection, tag or saved search) and keeps its name.
 function navLabel(nav){return !state.collection&&!state.desktopTag&&!state.savedSearch&&['전체 자료','최근 읽은 자료','즐겨찾기'].includes(nav)?valueLabel(nav):nav;} // i18n:keep — the app's own view values; a collection, tag or saved search keeps its own name
-function valueLabel(value){return ({'읽기 전':tr('읽기 전'),'읽는 중':tr('읽는 중'),'완독':tr('완독'),'전체 자료':tr('전체 자료'),'최근 읽은 자료':tr('최근 읽은 자료'),'즐겨찾기':tr('즐겨찾기'),'전체':tr('전체'),'번역 있음':tr('번역 있음'),'서지':tr('서지'),'첨부':tr('첨부'),'요약':tr('요약'),'주석':tr('주석'),'메모':tr('메모'),'태그':tr('태그')})[value]??value;} // i18n:keep — the keys are those values
+function valueLabel(value){return ({'읽기 전':tr('읽기 전'),'읽는 중':tr('읽는 중'),'완독':tr('완독'),'전체 자료':tr('전체 자료'),'최근 읽은 자료':tr('최근 읽은 자료'),'즐겨찾기':tr('즐겨찾기'),'전체':tr('전체'),'번역 있음':tr('번역 있음'),'서지':tr('서지'),'첨부':tr('첨부'),'요약':'AI','주석':tr('주석'),'메모':tr('메모'),'태그':tr('태그')})[value]??value;} // i18n:keep — the keys are those values
 // Keys the page kept under the app's earlier names move to the new prefix once, before any is read (desktop/storage-keys.js).
 try{appStorageKeys.adoptStorageKeys(localStorage);}catch{}
 // Memo and summary texts of the open vault, by key (renderer.js fills and saves them).

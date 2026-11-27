@@ -194,7 +194,7 @@ function editorAiMode(ed,mode){
   const length=target.text().length,what=target.what;
   root.querySelectorAll('[data-memo-ai-mode]').forEach(b=>{const on=b.dataset.memoAiMode===mode;b.classList.toggle('active',on);b.setAttribute('aria-checked',String(on));});
   const content=length&&tr('{what} 내용({chars}자)',{what,n:length,chars:length.toLocaleString(appI18n.uiLocale())}),picked=ai.selection&&tr('선택한 원문'),context=content&&picked?tr('{a}과 {b}',{a:content,b:picked}):content||picked||'';
-  root.querySelector('.memo-ai-hint').textContent=mode==='ask'?(context?tr('답을 {what} 끝에 추가합니다. {context}을 참고로 보내고, 논문 전체는 보내지 않습니다.',{what,context}):tr('답을 {what} 끝에 추가합니다. 논문 전체는 보내지 않습니다.',{what})):tr('{what} 전체({chars}자)를 요청대로 다시 씁니다. 결과를 보고 바꿀 때만 바뀝니다.',{what,n:length,chars:length.toLocaleString(appI18n.uiLocale())});
+  root.querySelector('.memo-ai-hint').textContent=mode==='ask'?(context?tr('답을 {what} 끝에 추가합니다. {context}을 참고로 보내고, 논문 전체는 보내지 않습니다(논문 전체에 묻기는 AI 탭).',{what,context}):tr('답을 {what} 끝에 추가합니다. 논문 전체는 보내지 않습니다(논문 전체에 묻기는 AI 탭).',{what})):tr('{what} 전체({chars}자)를 요청대로 다시 씁니다. 결과를 보고 바꿀 때만 바뀝니다.',{what,n:length,chars:length.toLocaleString(appI18n.uiLocale())});
   const area=root.querySelector('#editor-ai-instruction');area.placeholder=mode==='ask'?tr('질문 — 예: 이 개념을 쉽게 설명해 줘'):tr('요청 — 예: 핵심만 세 줄로 정리, 영어로 번역');area.setAttribute('aria-label',mode==='ask'?tr('질문'):tr('요청'));
   root.querySelector('.memo-ai-presets').innerHTML=[...(mode==='ask'&&ai.selection?[tr('선택한 부분을 설명해 줘')]:[]),...MEMO_AI_PRESETS[mode]].map(t=>`<button type="button" class="secondary small" data-memo-ai-preset="${t}">${t}</button>`).join('');
   const attach=root.querySelector('[data-editor-ai-image-add]');if(attach)attach.hidden=mode!=='ask';const list=root.querySelector('.memo-ai-image-list');if(list)list.hidden=mode!=='ask';
@@ -448,8 +448,16 @@ function mountNoteEditor(root,key,{memo=false,inWindow=false}={}){
   return ed;
 }
 // The wide editor in the app's dialog; a memo (not a summary field) also gets its title field.
+// An editor whose dialog was closed but whose close event has not arrived yet is let go before the dialog is used again
+// (its close event, when it comes, finds the new editor in an open dialog and leaves it).
+function closeStaleEditors(){
+  if(noteEditor){const ed=noteEditor;noteEditor=null;ed.destroy();}
+  if(annotationEditor){const {id,ed}=annotationEditor;annotationEditor=null;ed.destroy();flushAnnotation(id).catch(()=>{});}
+  dialog.classList.remove('note-editor-dialog','annotation-editor-dialog');dialog.style.height='';dialog.style.width='';
+}
 function openNoteEditor(key,label,memo=key.includes('-메모')&&!key.includes('#'),ai=null){ // i18n:keep — stored memo keys
   if(!key)return;if(memo)label=memoTitle(key,Math.max(0,memoKeysOf(Number(key.split('-')[0])).indexOf(key)));
+  closeStaleEditors();
   modal(esc(label||tr('메모')),noteEditorHtml(key,memo,savedNoteView()),btn(tr('닫기'),'close','primary'));
   dialog.classList.add('note-editor-dialog');
   try{const size=JSON.parse(localStorage.getItem('app-note-editor-size')||'null');if(size?.w>=480)dialog.style.width=Math.min(size.w,innerWidth-24)+'px';if(size?.h>=320)dialog.style.height=Math.min(size.h,innerHeight-24)+'px';}catch{}
@@ -457,7 +465,9 @@ function openNoteEditor(key,label,memo=key.includes('-메모')&&!key.includes('#
   noteEditor=mountNoteEditor(dialog.querySelector('.dialog-inner'),key,{memo});
   if(ai)editorAiToggle(noteEditor,ai.selection??null);
 }
-dialog.addEventListener('close',()=>{if(!noteEditor)return;const ed=noteEditor,{key}=ed;noteEditor=null;ed.destroy();dialog.classList.remove('note-editor-dialog');dialog.style.height='';dialog.style.width='';
+// A dialog's close event is queued, so it can arrive after the dialog was opened again (a form closed, then the wide
+// editor opened from it): a close while the dialog is open with this editor still in it belongs to an earlier opening.
+dialog.addEventListener('close',()=>{if(!noteEditor||dialog.open&&noteEditor.root.isConnected)return;const ed=noteEditor,{key}=ed;noteEditor=null;ed.destroy();dialog.classList.remove('note-editor-dialog');dialog.style.height='';dialog.style.width='';
   // The sidebar shows what was written in the wide editor.
   for(const area of document.querySelectorAll('.note-box textarea'))if(area.dataset.note===key){area.value=notes[key]||'';liveFields.get(area)?.setDoc(area.value);}refreshMemos();runDesktop(desktopNotes)();});
 // A mark put around the selection (Ctrl+B, Ctrl+I, the format bar), as one undo step:
@@ -715,6 +725,7 @@ function annotationAiTarget(id,ed){
 }
 function openAnnotationEditor(id,ai=null){
   const a=itemAnnotations.find(x=>x.id===id);if(!a)return;
+  closeStaleEditors();
   modal(esc(annotationTitle(a)),`<input class="memo-title editor-title" data-annot-title="${esc(id)}" value="${esc(ownAnnotationTitle(a))}" placeholder="${tr('제목')}" maxlength="200" aria-label="${tr('주석 제목')}">${a.quote?`<blockquote class="annot-quote">${esc(a.quote)}</blockquote>`:''}${noteEditorHtml(ANNOT_EDITOR_KEY,false,savedNoteView(),true)}`,btn(tr('닫기'),'close','primary'));
   dialog.classList.add('note-editor-dialog','annotation-editor-dialog');
   try{const size=JSON.parse(localStorage.getItem('app-note-editor-size')||'null');if(size?.w>=480)dialog.style.width=Math.min(size.w,innerWidth-24)+'px';if(size?.h>=320)dialog.style.height=Math.min(size.h,innerHeight-24)+'px';}catch{}
@@ -725,7 +736,7 @@ function openAnnotationEditor(id,ai=null){
   if(ai)editorAiToggle(ed,ed.aiTarget.selection()||ai.selection||null);
 }
 dialog.addEventListener('close',()=>{
-  if(!annotationEditor)return;const {id,ed}=annotationEditor;annotationEditor=null;ed.destroy();
+  if(!annotationEditor||dialog.open&&annotationEditor.ed.root.isConnected)return;const {id,ed}=annotationEditor;annotationEditor=null;ed.destroy();
   dialog.classList.remove('note-editor-dialog','annotation-editor-dialog');dialog.style.height='';dialog.style.width='';
   // The card shows what was written in the wide editor.
   flushAnnotation(id).catch(()=>{}).finally(()=>refreshAnnotations());

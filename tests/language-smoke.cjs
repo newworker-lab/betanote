@@ -628,15 +628,15 @@ const readSettings = async profile => JSON.parse(await fs.readFile(path.join(pro
       await p.evaluate(() => window.appApi.setLanguage({ ai: 'ja' })); await p.waitForFunction(() => aiLanguageNow === 'ja');
       const results = () => p.evaluate(() => insightState.results.get(targetKey()).map(r => ({ id: r.id, kind: r.kind, language: r.language })));
       const summaryCard = await p.evaluate(() => [...document.querySelectorAll('[data-ai-adopt]')].map(b => b.dataset.aiAdopt).at(-1)); assert.ok(summaryCard, 'a result card offers to add it');
-      const asked = (await results()).find(r => r.kind === 'summary'); assert.equal(asked.language, 'en', 'asked before the change');
-      await p.evaluate(id => adoptInsight(id), asked.id);
+      const asked = (await results()).find(r => r.kind === 'summary'); assert.equal(asked.language, 'en', 'asked before the change'); // it went into the summary parts as it came
       const adopted = () => p.evaluate(() => notes[`${state.selected}-summary-0`] || '');
       assert.match(await adopted(), /^\[AI summary · fixture-model · [A-Z][a-z]{2} \d{1,2}, \d{4}\]\n/, 'an English result keeps an English head after the change');
       const before = (await results()).length;
       await p.locator('[data-action="ai-summary"]').click(); await p.locator('#dialog[open] [data-action="ai-send"]').click();
       await p.waitForFunction(n => insightState.results.get(targetKey()).length > n, before);
       const japanese = (await results()).find(r => r.kind === 'summary'); assert.equal(japanese.language, 'ja');
-      await p.evaluate(id => adoptInsight(id), japanese.id);
+      assert.doesNotMatch(await adopted(), /AI 要約/, 'parts with writing are not filled by themselves');
+      await p.evaluate(id => adoptInsight(id, 'cards'), japanese.id);
       assert.match(await adopted(), /\n\n\[AI 要約 · fixture-model · \d{4}\/\d{1,2}\/\d{1,2}\]\n/, 'a Japanese result gets a Japanese head');
       // A result saved before results recorded a language is Korean.
       assert.deepEqual(await p.evaluate(() => [{ translation: 't', sections: { explanation: [{ text: 'x', basis: 'model', evidence: [] }] } }, { language: 'ja', translation: 't', sections: { explanation: [{ text: 'x', basis: 'model', evidence: [] }] } }].map(explainMarkdown)),

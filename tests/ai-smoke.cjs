@@ -63,7 +63,19 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     assert.match(card, /전체 3쪽/); assert.match(card, /근거 부족/); assert.match(card, /존재하지 않는 근거 1개는 제외/);
     assert.deepEqual(await p.locator('.insight-card .evidence').allTextContents(), ['p.1', 'p.3']);
     await p.locator('.insight-card .evidence').last().click(); await p.locator('.original-pages .page[data-page="3"] .ai-evidence').waitFor();
-    await p.locator('[data-ai-adopt]').first().click(); await p.locator('#toast').filter({ hasText: '요약 탭' }).waitFor();
+    // An AI summary goes into the tab's four summary parts as it comes when they are empty (they are here), and they
+    // show it at once. Parts with writing are left alone (tests/language-smoke.cjs).
+    await p.locator('#toast').filter({ hasText: '요약 칸' }).waitFor();
+    assert.match(await p.locator('.summary-card[data-summary="0"] .memo-line').innerText(), /레이아웃이 읽기 속도에 미치는 영향/, 'the parts are filled and drawn again at once');
+    assert.equal((await p.evaluate(() => notes[`${state.selected}-summary-0`])).match(/\[AI 요약/g).length, 1, 'once');
+    assert.deepEqual(await p.locator('.insight-card.open footer button').allTextContents(), ['요약 칸에 넣기', '메모로 저장'], 'a summary can still be put in again, or saved as a memo');
+    // 메모로 저장 always makes a memo of its own (the whole result, its parts named), and says where it went.
+    const memosBefore = await p.evaluate(() => memoKeysOf(state.selected).length);
+    await p.locator('.insight-card.open [data-ai-adopt]').click(); await p.locator('#toast').filter({ hasText: '새 메모로 저장했습니다' }).waitFor();
+    assert.equal(await p.evaluate(() => memoKeysOf(state.selected).length), memosBefore + 1, 'one new memo');
+    const saved = await p.evaluate(() => { const keys = memoKeysOf(state.selected); return { title: notes[keys.at(-1) + '#title'], text: notes[keys.at(-1)] }; });
+    assert.equal(saved.title, 'AI 요약'); assert.match(saved.text, /\*\*연구 질문\*\*\n• 레이아웃이 읽기 속도에 미치는 영향 \[p\.1\]/); assert.match(saved.text, /\*\*결과\*\*/);
+    await p.locator('#toast [data-open-memo]').click(); await p.locator('.reader-panel [data-tab="메모"].active').waitFor();
     await p.locator('[data-tab="요약"]').click();
     // The summary shows its four parts as cards; a card shows its first line (not the AI tag) and opens on a click.
     assert.equal(await p.locator('.summary-card').count(), 4); assert.equal(await p.locator('.summary-tab textarea').count(), 0, 'all folded');
@@ -73,7 +85,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('.summary-card[data-summary="2"]').click(); await p.locator('.summary-card.open[data-summary="2"]').waitFor(); assert.equal(await p.locator('.summary-card.open').count(), 1, 'one open at a time');
     assert.match(await p.locator('#summary-2').inputValue(), /\(근거 부족\)/);
     await p.keyboard.press('Escape'); await p.locator('.summary-card.open').waitFor({ state: 'detached' });
-    await p.locator('[data-tab="메모"]').click(); assert.equal(await (await openNote(p)).inputValue(), '내가 쓴 메모', 'adoption never touches other notes');
+    await p.locator('[data-tab="메모"]').click(); assert.equal(await p.evaluate(() => notes[`${state.selected}-메모`]), '내가 쓴 메모', 'adoption never touches other notes');
 
     // A passage is asked about from its annotation: select, 주석 추가 (N), then AI에게 묻기 in the form.
     // There is no 선택 설명 button in the 요약 tab and no AI 설명 in the selection's bar any more.
@@ -84,6 +96,11 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await p.locator('#dialog [data-action="save-annotation-ask"]').click();
     // The annotation is saved with its passage (no text of its own yet) and opens in the wide editor with the AI panel.
     await p.locator('.annotation-editor-dialog .note-ai:not([hidden]) #editor-ai-instruction').waitFor();
+    // The form's own close event may arrive after the editor opened (it is queued; how late depends on the machine): such
+    // a late close of an earlier opening leaves the editor and its AI panel as they are.
+    await p.evaluate(() => document.querySelector('#dialog').dispatchEvent(new Event('close'))); await p.waitForTimeout(150);
+    assert.equal(await p.evaluate(() => document.querySelector('#dialog').open && document.querySelector('#dialog').classList.contains('annotation-editor-dialog')), true, 'a late close leaves the editor open');
+    await p.locator('.annotation-editor-dialog .note-ai:not([hidden]) #editor-ai-instruction').waitFor({ timeout: 2000 });
     assert.equal(await p.locator('.annotation-editor-dialog #editor-ai-selection').isChecked(), true, 'the quoted passage goes with the question');
     await p.locator('#editor-ai-instruction').fill('이 문장을 설명해 줘'); await p.locator('[data-editor-ai-send]').click(); await p.locator('[data-editor-ai-take="append"]').click();
     const passageRequest = await app.evaluate(() => globalThis.requests.at(-1));
@@ -105,7 +122,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     assert.deepEqual(await p.locator('.insight-actions > *').evaluateAll(n => n.map(x => x.dataset.action || x.className)), ['ai-summary', 'insight-info']);
     assert.equal(await p.locator('.insight-panel > p.small.muted').count(), 0, 'the note is behind ⓘ, not a paragraph');
     const tip = p.locator('.insight-info-tip'); assert.equal(await tip.isVisible(), false);
-    await p.locator('[data-insight-info]').hover(); await tip.waitFor(); assert.match(await tip.textContent(), /노트로 채택/);
+    await p.locator('[data-insight-info]').hover(); await tip.waitFor(); assert.match(await tip.textContent(), /메모로 저장/); assert.match(await tip.textContent(), /논문 전체는 보내지 않습니다/);
     await p.locator('[data-insight-info]').click(); await p.locator('#insight-question').hover(); assert.equal(await tip.isVisible(), true, 'a click keeps the note open');
     await p.locator('.insight-ask').click({ position: { x: 2, y: 2 } }); await p.mouse.move(0, 0); await tip.waitFor({ state: 'hidden' });
     // Results are cards like memos: the new one open, the others its title and one line.
@@ -169,7 +186,7 @@ const openNote = async p => { await p.locator('#note, .memo-card[data-memo], .me
     await app.close(); p = await launch();
     await (await openNote(p)).waitFor(); await p.locator('[data-tab="요약"]').click();
     await p.locator('.insight-card').nth(4).waitFor(); assert.equal(await p.locator('.insight-card').count(), 5); assert.equal(await p.evaluate(() => itemAnnotations.filter(a => /Participants read/.test(a.quote) && /이어서 답합니다/.test(a.body)).length), 1, 'the annotation and its AI answer are kept'); assert.equal(await p.locator('.insight-card.open').count(), 0, 'after a restart every result is folded');
-    await p.locator('.insight-card').last().click(); assert.match(await p.locator('.insight-card.open [data-ai-adopt]').textContent(), /노트로 채택 \(1\)/);
+    await p.locator('.insight-card').last().click(); assert.match(await p.locator('.insight-card.open [data-ai-adopt]').textContent(), /메모로 저장 \(1\)/);
     // Two papers side by side from the library selection.
     await p.locator('[data-action="back"]').click(); await app.evaluate((_, f) => globalThis.openQueue.push([f]), path.join(temp, 'second.pdf')); await p.locator('[data-action="add-files"]').first().click();
     await p.locator('[data-batch-paper]').nth(0).check(); await p.locator('[data-batch-paper]').nth(1).check();
