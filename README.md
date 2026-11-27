@@ -24,6 +24,10 @@
   <a href="#자주-묻는-질문">자주 묻는 질문</a>
 </p>
 
+<p align="center">
+  <b>Windows · Linux</b>에서 쓸 수 있고, <b>macOS용 베타</b>(Apple 실리콘 · 인텔)도 받을 수 있습니다 → <a href="#1-내려받기">내려받기</a>
+</p>
+
 ![서재에서 논문을 열고 동시보기로 번역을 나란히 읽는 화면](docs/images/hero.gif)
 
 <p align="center"><sub>논문을 열고 <b>동시보기</b>를 누르면 원문(왼쪽) 옆에 같은 배치의 번역(오른쪽)이 놓입니다. 번역은 βnote가 실제로 번역한 결과입니다.<br>논문: Goldrick et al. (2019), <i>Biotechnology Journal</i> 15(3): 1800684 · CC BY</sub></p>
@@ -337,6 +341,19 @@
 - **ChatGPT 계정**: 구독 중인 요금제에 포함된 사용량 안에서 씁니다. βnote가 따로 청구하는 요금은 없고, 그 요금제의 사용 한도가 적용됩니다.
 - **로컬 모델**: 비용이 없습니다. 대신 PC 성능이 필요합니다.
 - **API 키**: 쓴 만큼 그 회사 계정에 청구됩니다.
+
+</details>
+
+<details>
+<summary><b>맥(macOS)에서도 쓸 수 있나요?</b></summary>
+<br>
+
+베타로 쓸 수 있습니다. [릴리스 페이지](../../releases)에서 Apple 실리콘(M1 이후) 맥은 `betanote-<버전>-macos-arm64.zip`, 인텔 맥은 `betanote-<버전>-macos-x64.zip`을 받아 압축을 풀고, `betanote.app`을 우클릭해 `열기`로 실행합니다.
+
+- 베타인 이유: 맥 빌드 서버의 자동 시험은 통과했지만, 실제 맥에서 충분히 써 보지 못했습니다.
+- Apple 서명·공증이 없어 처음 열 때 경고가 뜹니다. "손상되어 열 수 없습니다"라고 나오면 터미널에서 `xattr -cr ~/Downloads/betanote.app`(앱을 둔 경로)을 한 번 실행하세요.
+- 단축키는 `Ctrl` 대신 `⌘`를 씁니다.
+- 겪은 문제는 [이슈](../../issues)로 알려 주시면 정식 지원에 큰 도움이 됩니다.
 
 </details>
 
